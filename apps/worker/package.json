@@ -1,0 +1,19 @@
+{
+  "name": "@assessiq/worker",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "dev": "tsc -p tsconfig.json --watch --preserveWatchOutput & node --watch dist/index.js",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@assessiq/shared": "*",
+    "bullmq": "^5.25.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "typescript": "^5.6.3"
+  }
+}

@@ -1,0 +1,21 @@
+# Local development services. Run: npm run infra:up
+# Judge0 (code execution sandbox) is added in Sprint 6; it needs its own compose stack.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: assessiq
+      POSTGRES_PASSWORD: assessiq
+      POSTGRES_DB: assessiq
+    ports:
+      - '5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - '6379:6379'
+
+volumes:
+  pgdata:

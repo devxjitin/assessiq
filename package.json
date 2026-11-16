@@ -1,0 +1,32 @@
+{
+  "name": "assessiq",
+  "private": true,
+  "version": "0.0.0",
+  "description": "AssessIQ by NandiVex Technologies - online assessment and certification platform",
+  "engines": {
+    "node": ">=20"
+  },
+  "workspaces": [
+    "packages/shared",
+    "packages/question-parser",
+    "apps/api",
+    "apps/worker",
+    "apps/web"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "dev:api": "npm run dev -w @assessiq/api",
+    "dev:worker": "npm run dev -w @assessiq/worker",
+    "dev:web": "npm run dev -w @assessiq/web",
+    "infra:up": "docker compose -f infra/docker-compose.yml up -d",
+    "infra:down": "docker compose -f infra/docker-compose.yml down"
+  },
+  "devDependencies": {
+    "prettier": "^3.3.3",
+    "typescript": "^5.6.3"
+  }
+}
