@@ -105,7 +105,7 @@ jobs:
               \"mkdir -p /opt/assessiq && cd /opt/assessiq\",
               \"aws s3 cp s3://${{ vars.FILES_BUCKET }}/deploy/ . --recursive --region $AWS_REGION\",
               \"chmod +x deploy.sh\",
-              \"ENVIRONMENT=$ENVIRONMENT AWS_REGION=$AWS_REGION FILES_BUCKET=${{ vars.FILES_BUCKET }} ECR_REGISTRY=$REGISTRY IMAGE_TAG=$IMAGE_TAG API_HOST=${{ vars.API_HOSTNAME }} WEB_ORIGIN=https://${{ vars.WEB_HOSTNAME }} ./deploy.sh\"
+              \"ENVIRONMENT=$ENVIRONMENT AWS_REGION=$AWS_REGION FILES_BUCKET=${{ vars.FILES_BUCKET }} ECR_REGISTRY=$REGISTRY IMAGE_TAG=$IMAGE_TAG API_HOST=${{ vars.API_HOSTNAME }} WEB_ORIGIN=https://${{ vars.WEB_HOSTNAME }} DB_HOST=${{ vars.DB_HOST }} DB_SECRET_ARN=${{ vars.DB_SECRET_ARN }} ./deploy.sh\"
             ]" \
             --query Command.CommandId --output text)
           aws ssm wait command-executed --command-id "$CMD_ID" --instance-id "${{ vars.INSTANCE_ID }}" || true

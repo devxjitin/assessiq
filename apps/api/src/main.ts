@@ -1,16 +1,18 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
+import { configureApp } from './configure-app';
+import { ENV, Env } from './config/env';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-  app.enableCors({
-    origin: (process.env.WEB_ORIGIN ?? 'http://localhost:3000').split(','),
-    credentials: true,
-  });
-  const port = Number(process.env.PORT ?? 4000);
-  await app.listen(port, '0.0.0.0');
-  console.log(`AssessIQ API listening on :${port}`);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  // Behind Caddy: trust one proxy hop so req.ip is the real client address.
+  app.set('trust proxy', 1);
+  configureApp(app);
+  const env = app.get<Env>(ENV);
+  await app.listen(env.PORT, '0.0.0.0');
+  console.log(`AssessIQ API listening on :${env.PORT}`);
 }
 
 void bootstrap();

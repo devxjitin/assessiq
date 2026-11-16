@@ -1,16 +1,26 @@
 import { Controller, Get } from '@nestjs/common';
-import { BRAND, PRICING } from '@assessiq/shared';
+import { BRAND } from '@assessiq/shared';
+import { Public } from '../common/decorators';
+import { PrismaService } from '../prisma/prisma.service';
 
+@Public()
 @Controller('health')
 export class HealthController {
+  constructor(private readonly prisma: PrismaService) {}
+
   @Get()
-  check() {
+  async check() {
+    let database = 'ok';
+    try {
+      await this.prisma.$queryRaw`SELECT 1`;
+    } catch {
+      database = 'unreachable';
+    }
     return {
-      status: 'ok',
+      status: database === 'ok' ? 'ok' : 'degraded',
       service: `${BRAND.PRODUCT} API`,
+      database,
       time: new Date().toISOString(),
-      // Handy to confirm the shared package is wired up correctly.
-      joinFeePaise: PRICING.EXAM_JOIN_PAISE,
     };
   }
 }
