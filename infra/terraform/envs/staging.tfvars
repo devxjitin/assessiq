@@ -12,5 +12,5 @@ create_account_budget = false # skipped for now; set true + budget_email to enab
 budget_email          = ""    # <- your email for $20 / $50 / $80 alerts
 
 # GitHub repo ("owner/name") allowed to deploy via OIDC. Fill in once the repository exists.
-github_repository           = ""
-create_github_oidc_provider = true
+github_repository           = "devxjitin/assessiq"
+create_github_oidc_provider = false # already exists in this AWS account (shared with other projects)
