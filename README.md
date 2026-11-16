@@ -1,7 +1,7 @@
 # AssessIQ
 
 Online assessments and verified certificates by NandiVex Technologies.
-Plan: [../ASSESSIQ_IMPLEMENTATION_PLAN.md](../ASSESSIQ_IMPLEMENTATION_PLAN.md). Legacy app: the parent folder (Exam Hall).
+Plan: [ASSESSIQ_IMPLEMENTATION_PLAN.md](ASSESSIQ_IMPLEMENTATION_PLAN.md). Legacy app: the parent folder (Exam Hall).
 
 ## Layout
 
@@ -39,7 +39,7 @@ npm run dev:worker
 
 ## Not yet done (Sprint 0 remainder)
 
-ESLint config, Prisma + migrations (Sprint 1), Terraform, deploy workflow, `git init` + remote.
+Still open from Sprint 0: ESLint and commit hooks, design system and wireframes, production Terraform apply, working GitHub Actions (blocked by billing). See the plan file for full status.
 
 ## Sprint 1: identity (done)
 
