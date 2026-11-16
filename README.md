@@ -40,3 +40,13 @@ npm run dev:worker
 ## Not yet done (Sprint 0 remainder)
 
 ESLint config, Prisma + migrations (Sprint 1), Terraform, deploy workflow, `git init` + remote.
+
+## Sprint 1: identity (done)
+
+- **API** (`apps/api`): register, email-code verification, login, refresh-token rotation with reuse detection, logout, password reset and change, profile, admin user list/suspend. Passwords use argon2id; failed logins lock the account for 15 minutes; auth routes are rate limited.
+- **Access control:** a global JWT guard plus `@Roles()`; routes are private unless marked `@Public()`. Unverified emails cannot sign in, so they cannot reach any exam feature.
+- **Database:** Prisma + Postgres (`apps/api/prisma`). Run `npm run db:migrate -w @assessiq/api` after pulling.
+- **Tests:** `npm test` (needs Postgres from `npm run infra:up`; the API tests use the `assessiq_test` database).
+- **First admin** (admins cannot self-register):
+  `ADMIN_EMAIL=... ADMIN_PASSWORD=... ADMIN_NAME=... npm run seed:admin -w @assessiq/api` (after `npm run build`).
+- **Email:** `MAIL_TRANSPORT=log` prints codes to the console in development; `ses` sends real mail (SES sandbox only delivers to verified addresses until production access is approved).
