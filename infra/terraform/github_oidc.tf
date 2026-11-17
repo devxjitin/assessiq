@@ -43,7 +43,10 @@ data "aws_iam_policy_document" "github_assume" {
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.github_repository}:environment:${var.environment}"]
+      values = compact([
+        "repo:${var.github_repository}:environment:${var.environment}",
+        var.github_immutable_subject == "" ? "" : "repo:${var.github_immutable_subject}:environment:${var.environment}",
+      ])
     }
   }
 }
