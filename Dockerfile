@@ -9,16 +9,18 @@ RUN apk add --no-cache openssl
 
 COPY package.json package-lock.json tsconfig.base.json ./
 COPY packages/shared/package.json packages/shared/
+COPY packages/question-parser/package.json packages/question-parser/
 COPY apps/${APP}/package.json apps/${APP}/
-RUN npm ci -w @assessiq/shared -w @assessiq/${APP} --include-workspace-root=false
+RUN npm ci -w @assessiq/shared -w @assessiq/question-parser -w @assessiq/${APP} --include-workspace-root=false
 
 COPY packages/shared packages/shared
+COPY packages/question-parser packages/question-parser
 COPY apps/${APP} apps/${APP}
 # The API build also runs `prisma generate`; DATABASE_URL is only a placeholder for that step.
 RUN DATABASE_URL=postgresql://build:build@localhost:5432/build \
-    npm run build -w @assessiq/shared -w @assessiq/${APP}
+    npm run build -w @assessiq/shared -w @assessiq/question-parser -w @assessiq/${APP}
 # Drop dev dependencies for the runtime image (prisma CLI stays: it runs migrations).
-RUN npm prune --omit=dev -w @assessiq/shared -w @assessiq/${APP}
+RUN npm prune --omit=dev -w @assessiq/shared -w @assessiq/question-parser -w @assessiq/${APP}
 
 FROM node:22-alpine AS runtime
 ARG APP
@@ -27,6 +29,7 @@ WORKDIR /app
 RUN apk add --no-cache openssl
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/packages/shared ./packages/shared
+COPY --from=build /app/packages/question-parser ./packages/question-parser
 COPY --from=build /app/apps/${APP} ./apps/${APP}
 COPY package.json ./
 USER node

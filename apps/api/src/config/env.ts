@@ -11,6 +11,9 @@ const schema = z.object({
   SES_FROM_EMAIL: z.string().default('no-reply@assessiq.nandivex.in'),
   SES_CONFIGURATION_SET: z.string().optional(),
   AWS_REGION: z.string().default('ap-south-1'),
+  // Private file storage (exam logos, later certificates). `memory` is for tests/local dev.
+  STORAGE_DRIVER: z.enum(['s3', 'memory']).default('memory'),
+  S3_BUCKET: z.string().optional(),
   COOKIE_SECURE: z.enum(['true', 'false']).optional(),
   ACCESS_TTL_MIN: z.coerce.number().default(15),
   REFRESH_TTL_DAYS: z.coerce.number().default(30),

@@ -38,6 +38,7 @@ unset DB_SECRET
   echo "WEB_ORIGIN=${WEB_ORIGIN}"
   echo "AWS_REGION=${AWS_REGION}"
   echo "S3_BUCKET=${FILES_BUCKET}"
+  echo "STORAGE_DRIVER=s3"
   echo "DATABASE_URL=${DATABASE_URL}"
   aws ssm get-parameters-by-path --region "$AWS_REGION" --path "/assessiq/${ENVIRONMENT}/" \
     --with-decryption --query 'Parameters[].[Name,Value]' --output text |

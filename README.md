@@ -41,6 +41,14 @@ npm run dev:worker
 
 Still open from Sprint 0: ESLint and commit hooks, design system and wireframes, production Terraform apply, working GitHub Actions (blocked by billing). See the plan file for full status.
 
+## Sprint 2: exam builder (done)
+
+- **Trainer-only API** (`apps/api/src/exams`): create, edit and delete **draft** exams; single-answer, multiple-answer and subjective questions; reorder; bulk import from pasted text (check first, then import); private logo upload; "preview as student" that never includes answers, explanations or rubrics.
+- **Rules:** a trainer only ever sees their own exams (others return 404); only `DRAFT` exams can be changed; at most 300 questions per exam; negative marks cannot exceed the marks for a correct answer.
+- **Logo:** PNG or JPEG up to 512 KB, type checked from the file contents (SVG is refused). Stored in the private S3 files bucket and served only through the API to the owner. Locally and in tests it uses an in-memory store (`STORAGE_DRIVER=memory`); staging sets `STORAGE_DRIVER=s3`.
+- **Web:** `/exams/` (list), `/exams/new/`, `/exams/edit/?id=…` (questions, import, settings, logo), `/exams/preview/?id=…`.
+- **Not yet:** coding questions (Sprint 6), publishing and the ₹199 payment (Sprint 3).
+
 ## Sprint 1: identity (done)
 
 - **API** (`apps/api`): register, email-code verification, login, refresh-token rotation with reuse detection, logout, password reset and change, profile, admin user list/suspend. Passwords use argon2id; failed logins lock the account for 15 minutes; auth routes are rate limited.

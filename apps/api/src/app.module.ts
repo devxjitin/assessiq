@@ -7,7 +7,9 @@ import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { RolesGuard } from './auth/roles.guard';
 import { ConfigModule } from './config/config.module';
+import { ExamsModule } from './exams/exams.module';
 import { HealthController } from './health/health.controller';
+import { StorageModule } from './storage/storage.module';
 import { MailModule } from './mail/mail.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { UsersModule } from './users/users.module';
@@ -29,9 +31,11 @@ import { UsersModule } from './users/users.module';
     PrismaModule,
     AuditModule,
     MailModule,
+    StorageModule,
     AuthModule,
     UsersModule,
     AdminModule,
+    ExamsModule,
   ],
   controllers: [HealthController],
   providers: [

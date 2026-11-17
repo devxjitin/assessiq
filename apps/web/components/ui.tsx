@@ -74,13 +74,19 @@ export function Button({
   loading,
   children,
   variant = 'primary',
+  small,
   ...props
 }: {
   loading?: boolean;
+  small?: boolean;
   variant?: 'primary' | 'secondary' | 'danger';
 } & React.ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
-    <button className={`btn btn-${variant}`} disabled={loading || props.disabled} {...props}>
+    <button
+      className={`btn btn-${variant}${small ? ' btn-small' : ''}`}
+      disabled={loading || props.disabled}
+      {...props}
+    >
       {loading ? 'Please wait…' : children}
     </button>
   );

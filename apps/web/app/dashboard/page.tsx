@@ -139,7 +139,12 @@ export default function DashboardPage() {
         <div className="grid">
           <section className="card">
             <h2 style={{ marginTop: 0 }}>Your exams</h2>
-            <p className="muted">Create and manage exams. Available soon.</p>
+            <p className="muted">
+              Build exams, add questions, import them in bulk and preview as a student.
+            </p>
+            <Link className="btn btn-primary btn-link" href="/exams/">
+              Open exam builder
+            </Link>
           </section>
           <section className="card">
             <h2 style={{ marginTop: 0 }}>Earnings</h2>

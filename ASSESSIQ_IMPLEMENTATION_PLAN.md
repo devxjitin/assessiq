@@ -17,17 +17,17 @@ Legend: ✅ done · 🟡 partly done · ⬜ not started · ⛔ blocked
 | ------------- | -------------------------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | P0 Foundation | **S0** Setup                                       | ✅ Done (with open items) | Monorepo, AWS staging, DNS/HTTPS, SES verified, deploy path proven. Open: GitHub Actions blocked by billing, Razorpay KYC, budget alerts, design/wireframes. |
 | P1 Core MVP   | **S1** Identity                                    | ✅ Done, live on staging  | Accounts, email-code verification, login/refresh, password reset, roles, admin, audit log. 28 API tests.                                                     |
-| P1 Core MVP   | S2 Exam builder                                    | ⬜ Next                   |                                                                                                                                                              |
-| P1 Core MVP   | S3 Creation payments                               | ⬜                        | Needs Razorpay account and test keys                                                                                                                         |
+| P1 Core MVP   | **S2** Exam builder                                | ✅ Done, live on staging  | Draft exams, single/multi/subjective questions, bulk import, private logo, student preview. 19 new API tests.                                                |
+| P1 Core MVP   | S3 Creation payments                               | ⬜ Next                   | Needs Razorpay account and test keys                                                                                                                         |
 | P1 Core MVP   | S4 Join & take exam                                | ⬜                        |                                                                                                                                                              |
 | P1 Core MVP   | S5 Grading & results                               | ⬜                        |                                                                                                                                                              |
 | P2            | S6 Coding engine · S7 Integrity                    | ⬜                        |                                                                                                                                                              |
 | P3            | S8 Ledger/payouts · S9 Certificates · S10 Practice | ⬜                        |                                                                                                                                                              |
 | P4            | S11 Admin & migration · S12 Launch                 | ⬜                        |                                                                                                                                                              |
 
-**Sprints done: 2 of 13.** Overall, the identity layer and the whole deployment pipeline (to staging) are in place; none of the exam, payment or certificate features exist yet.
+**Sprints done: 3 of 13 (S0, S1, S2).** Overall, the identity layer and the whole deployment pipeline (to staging) are in place; trainers can build draft exams; payments, taking exams and certificates do not exist yet.
 
-**What exists today:** a private-by-default API with login and roles, a web app with sign-up/sign-in/profile/admin user list, a Postgres database with migrations, AWS staging (VPC, EC2, RDS, S3, CloudFront, ECR, SES, IAM deploy role), HTTPS on both hostnames, and 38 passing automated tests.
+**What exists today:** a private-by-default API with login and roles, a web app with sign-up/sign-in/profile/admin user list, a Postgres database with migrations, AWS staging (VPC, EC2, RDS, S3, CloudFront, ECR, SES, IAM deploy role), HTTPS on both hostnames, and 57 passing automated tests.
 
 **Needs your action (cannot be done from code):**
 
@@ -331,13 +331,37 @@ Each sprint ends with a demo on `staging` and a short retro. "Done" means code r
 
 **Goal:** a trainer can pay ₹199 and publish an exam; a student can pay ₹149, take it and see results (MCQ + subjective).
 
-| Sprint                       | Goal                | Scope                                                                                                                                                                                                                                 | Acceptance criteria                                                                                           |
-| ---------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| **S1: Identity** ✅          | Secure accounts     | Sign-up/login for Student and Examiner, email OTP verification (SES), JWT + refresh, password reset, RBAC guards, profile pages, admin seed user, audit log base                                                                      | Passwords hashed (argon2id); unverified emails can't join or create exams; role guards covered by tests       |
-| **S2: Exam builder** ⬜ next | Build exams         | Exam CRUD (draft), settings (duration, window, pass %, shuffle, negative marks), **single + multi MCQ** and **subjective** editors, **logo upload** to S3, bulk import (ported parser, extended for multi-select), preview as student | Trainer builds a 100-question exam in under 10 minutes via import; logo stored privately                      |
-| **S3: Creation payments** ⬜ | ₹199 to publish     | Razorpay Orders + Checkout, signature verification, **webhook handler** (idempotent), payment records, invoice/receipt email, exam code generation (crypto-random, e.g. `NVX-7K3P9Q`), share link/QR/WhatsApp                         | Exam can't be published without a captured payment; a duplicate webhook doesn't double-process                |
-| **S4: Join & take exam** ⬜  | Student exam engine | Join by code → ₹149 payment → enrollment; exam lobby; **server-timed attempt**, per-student shuffle, autosave, navigator/flagging, submit/auto-submit; ported anti-cheat with server-side event logging and strike decision           | Answers survive a page refresh/network drop; late submissions rejected; the API never returns correct answers |
-| **S5: Grading & results** ⬜ | Results             | Auto-grade single/multi MCQ (all-or-nothing/partial), subjective grading screen with rubric and feedback, finalise results, student result page and scorecard, examiner dashboard (attempts, scores, violations), CSV export          | Grading math covered by unit tests; results hidden until finalised                                            |
+| Sprint                            | Goal                | Scope                                                                                                                                                                                                                                 | Acceptance criteria                                                                                           |
+| --------------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| **S1: Identity** ✅               | Secure accounts     | Sign-up/login for Student and Examiner, email OTP verification (SES), JWT + refresh, password reset, RBAC guards, profile pages, admin seed user, audit log base                                                                      | Passwords hashed (argon2id); unverified emails can't join or create exams; role guards covered by tests       |
+| **S2: Exam builder** ✅           | Build exams         | Exam CRUD (draft), settings (duration, window, pass %, shuffle, negative marks), **single + multi MCQ** and **subjective** editors, **logo upload** to S3, bulk import (ported parser, extended for multi-select), preview as student | Trainer builds a 100-question exam in under 10 minutes via import; logo stored privately                      |
+| **S3: Creation payments** ⬜ next | ₹199 to publish     | Razorpay Orders + Checkout, signature verification, **webhook handler** (idempotent), payment records, invoice/receipt email, exam code generation (crypto-random, e.g. `NVX-7K3P9Q`), share link/QR/WhatsApp                         | Exam can't be published without a captured payment; a duplicate webhook doesn't double-process                |
+| **S4: Join & take exam** ⬜       | Student exam engine | Join by code → ₹149 payment → enrollment; exam lobby; **server-timed attempt**, per-student shuffle, autosave, navigator/flagging, submit/auto-submit; ported anti-cheat with server-side event logging and strike decision           | Answers survive a page refresh/network drop; late submissions rejected; the API never returns correct answers |
+| **S5: Grading & results** ⬜      | Results             | Auto-grade single/multi MCQ (all-or-nothing/partial), subjective grading screen with rubric and feedback, finalise results, student result page and scorecard, examiner dashboard (attempts, scores, violations), CSV export          | Grading math covered by unit tests; results hidden until finalised                                            |
+
+#### Sprint 2 completion report ✅ (done and live on staging)
+
+| Scope item                                                | Status | Where / how                                                                                                              |
+| --------------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------ |
+| Exam create, edit, delete (draft only)                    | ✅     | `/exams` API; web `/exams/`, `/exams/new/`, `/exams/edit/?id=`. Non-draft exams are locked (409)                         |
+| Settings: duration, window, pass %, shuffle, max students | ✅     | Window (opens/closes) is optional while drafting and becomes required at publish (Sprint 3)                              |
+| Negative marking                                          | ✅     | Set **per question** (default 0), not per exam, so mixed papers work; cannot exceed the question marks                   |
+| Single-answer, multiple-answer and subjective questions   | ✅     | Validated with shared zod rules; reorder and delete renumber safely; limit 300 questions                                 |
+| Bulk import (parser extended for multi-select)            | ✅     | Paste text, **check** (preview) then import; default marks and negative marks apply                                      |
+| Logo upload, stored privately                             | ✅     | PNG/JPEG up to 512 KB, type sniffed from content (SVG refused); private S3 key; served only to the owner through the API |
+| Preview as student                                        | ✅     | Never includes correct answers, explanations or rubrics (tested)                                                         |
+| Ownership                                                 | ✅     | A trainer cannot read or change another trainer's exam (404)                                                             |
+| Tests                                                     | ✅     | **19 new API tests**; 57 in the whole repo                                                                               |
+| Deployed                                                  | ✅     | Web, API and migration on staging. Dockerfile updated to include the question-parser package                             |
+
+**Acceptance criteria:** bulk import works for large papers (300-question limit tested; the 125-question CEH sample parses). The "under 10 minutes" timing was not measured with a real trainer. Logo is stored privately ✅.
+
+**Known gaps after Sprint 2:**
+
+- Coding questions are not available yet (Sprint 6). Subjective answers are marked by hand (Sprint 5).
+- Not smoke-tested on staging with a real trainer account yet (needs an email that SES can deliver to while in sandbox).
+- No automated browser UI tests; the pages were type-checked and built, not clicked through.
+- No question images or rich text yet; questions are plain text.
 
 #### Sprint 1 completion report ✅ (done and live on staging)
 

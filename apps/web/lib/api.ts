@@ -23,7 +23,8 @@ export function setAccessToken(token: string | null) {
 }
 
 interface Options {
-  method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
+  method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
+  /** JSON-serialised unless it is FormData (file uploads). */
   body?: unknown;
   /** Send the access token (default true). */
   auth?: boolean;
@@ -31,13 +32,14 @@ interface Options {
 
 async function send(path: string, { method = 'GET', body, auth = true }: Options) {
   const headers: Record<string, string> = {};
-  if (body !== undefined) headers['Content-Type'] = 'application/json';
+  const isForm = typeof FormData !== 'undefined' && body instanceof FormData;
+  if (body !== undefined && !isForm) headers['Content-Type'] = 'application/json';
   if (auth && accessToken) headers.Authorization = `Bearer ${accessToken}`;
   return fetch(`${API_URL}${path}`, {
     method,
     headers,
     credentials: 'include',
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: body === undefined ? undefined : isForm ? (body as FormData) : JSON.stringify(body),
   });
 }
 
@@ -72,6 +74,17 @@ export function refreshSession(): Promise<AuthResponse | null> {
     }
   })();
   return refreshing;
+}
+
+/** Fetches a private file (needs the access token, so it cannot be a plain <img src>). */
+export async function apiBlob(path: string): Promise<Blob> {
+  let res = await send(path, {});
+  if (res.status === 401) {
+    const renewed = await refreshSession();
+    if (renewed) res = await send(path, {});
+  }
+  if (!res.ok) throw await toError(res);
+  return res.blob();
 }
 
 export async function api<T = unknown>(path: string, options: Options = {}): Promise<T> {

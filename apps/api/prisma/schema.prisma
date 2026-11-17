@@ -27,6 +27,25 @@ enum OtpPurpose {
   RESET_PASSWORD
 }
 
+enum ExamStatus {
+  DRAFT
+  PAYMENT_PENDING
+  PUBLISHED
+  LIVE
+  CLOSED
+  GRADING
+  RESULTS_FINAL
+  CERT_PENDING_APPROVAL
+  CERT_RELEASED
+}
+
+enum QuestionType {
+  SINGLE
+  MULTI
+  SUBJECTIVE
+  CODING
+}
+
 model User {
   id                String     @id @default(uuid()) @db.Uuid
   email             String     @unique
@@ -44,8 +63,57 @@ model User {
   examinerProfile ExaminerProfile?
   otps            EmailOtp[]
   refreshTokens   RefreshToken[]
+  exams           Exam[]
 
   @@index([role])
+}
+
+model Exam {
+  id               String     @id @default(uuid()) @db.Uuid
+  examinerId       String     @db.Uuid
+  title            String
+  description      String?
+  instructions     String?
+  status           ExamStatus @default(DRAFT)
+  durationMinutes  Int        @default(60)
+  startsAt         DateTime?
+  endsAt           DateTime?
+  passPercent      Float      @default(40)
+  shuffleQuestions Boolean    @default(true)
+  shuffleOptions   Boolean    @default(true)
+  maxStudents      Int        @default(1000)
+  // Certificate logo for this exam (private S3 key). Falls back to the trainer's default logo.
+  logoKey          String?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  examiner  User       @relation(fields: [examinerId], references: [id], onDelete: Restrict)
+  questions Question[]
+
+  @@index([examinerId, createdAt])
+  @@index([status])
+}
+
+model Question {
+  id             String       @id @default(uuid()) @db.Uuid
+  examId         String       @db.Uuid
+  position       Int
+  type           QuestionType
+  body           String
+  // Choice questions only: option texts, and the zero-based indexes of the correct ones.
+  options        String[]
+  correctOptions Int[]
+  marks          Float        @default(4)
+  negativeMarks  Float        @default(0)
+  explanation    String?
+  // Subjective questions only: marking guidance for the grader.
+  rubric         String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  exam Exam @relation(fields: [examId], references: [id], onDelete: Cascade)
+
+  @@index([examId, position])
 }
 
 model ExaminerProfile {
