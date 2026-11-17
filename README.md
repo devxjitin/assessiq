@@ -41,6 +41,13 @@ npm run dev:worker
 
 Still open from Sprint 0: ESLint and commit hooks, design system and wireframes, production Terraform apply, working GitHub Actions (blocked by billing). See the plan file for full status.
 
+## Sprint 4: joining and taking exams (done locally)
+
+- **Student flow:** `/join/` (enter a code, see the exam and the ₹149 fee, pay, enrolled) then the dashboard's **My exams** list, then `/attempt/?id=…` (full-screen exam with countdown, navigator, flagging, autosave).
+- **API:** `GET /join/:code`, `POST /join/:code/order`, `GET /me/enrollments`, `POST /attempts`, `GET /attempts/:id`, `PUT /attempts/:id/answers/:questionId`, `POST /attempts/:id/submit`, `POST /attempts/:id/events`.
+- **Rules:** the server owns the clock and the deadline; each student gets their own question and option order; correct answers are never sent to the browser; one attempt per enrollment; 3 strikes (leaving full screen, switching tab or window) auto-submit. Proctoring is advisory evidence, not proof.
+- **Not yet:** grading and results (Sprint 5), a job that auto-submits abandoned attempts (Sprint 5).
+
 ## Sprint 3: publishing and payments (done, fake provider)
 
 - **Flow:** the trainer opens the **Publish** tab, pays the creation fee (₹199), and the exam becomes `PUBLISHED` with a share code like `NVX-7K3P9Q` and an emailed receipt. Publishing needs at least one question and an open/close window that is in the future and at least as long as the exam.

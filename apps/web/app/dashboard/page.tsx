@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Button, Shell } from '../../components/ui';
 import { api } from '../../lib/api';
+import { StudentExams } from '../../components/student-exams';
 import { useRequireAuth } from '../../lib/auth';
 
 interface AdminUser {
@@ -122,18 +123,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {user.role === 'STUDENT' && (
-        <div className="grid">
-          <section className="card">
-            <h2 style={{ marginTop: 0 }}>Join an exam</h2>
-            <p className="muted">Enter an exam code from your trainer. Available soon.</p>
-          </section>
-          <section className="card">
-            <h2 style={{ marginTop: 0 }}>Results and certificates</h2>
-            <p className="muted">Your results and certificates will appear here.</p>
-          </section>
-        </div>
-      )}
+      {user.role === 'STUDENT' && <StudentExams />}
 
       {user.role === 'EXAMINER' && (
         <div className="grid">

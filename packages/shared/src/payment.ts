@@ -23,6 +23,8 @@ export interface PublishOrderDto {
 
 export interface PublishResultDto {
   exam: { id: string; status: string; code: string | null };
+  /** Set when the payment was a student join fee. */
+  enrollmentId?: string;
   receiptNo: string;
 }
 

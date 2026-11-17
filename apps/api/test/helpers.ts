@@ -34,7 +34,7 @@ export async function createTestApp(): Promise<TestContext> {
     http: () => request(app.getHttpServer()),
     reset: async () => {
       await prisma.$executeRawUnsafe(
-        'TRUNCATE TABLE "AuditLog", "WebhookEvent", "Payment", "Question", "Exam", "RefreshToken", "EmailOtp", "ExaminerProfile", "User" CASCADE',
+        'TRUNCATE TABLE "AuditLog", "ProctorEvent", "Answer", "Attempt", "Enrollment", "WebhookEvent", "Payment", "Question", "Exam", "RefreshToken", "EmailOtp", "ExaminerProfile", "User" CASCADE',
       );
       mail.clear();
     },

@@ -50,6 +50,14 @@ enum PaymentPurpose {
   EXAM_JOIN
 }
 
+enum AttemptStatus {
+  IN_PROGRESS
+  SUBMITTED
+  AUTO_SUBMITTED
+  GRADED
+  RESULT_PUBLISHED
+}
+
 enum QuestionType {
   SINGLE
   MULTI
@@ -58,24 +66,26 @@ enum QuestionType {
 }
 
 model User {
-  id                String     @id @default(uuid()) @db.Uuid
-  email             String     @unique
-  name              String
-  phone             String?
-  passwordHash      String
-  role              Role
-  status            UserStatus @default(ACTIVE)
-  emailVerifiedAt   DateTime?
-  failedLoginCount  Int        @default(0)
-  lockedUntil       DateTime?
-  createdAt         DateTime   @default(now())
-  updatedAt         DateTime   @updatedAt
+  id               String     @id @default(uuid()) @db.Uuid
+  email            String     @unique
+  name             String
+  phone            String?
+  passwordHash     String
+  role             Role
+  status           UserStatus @default(ACTIVE)
+  emailVerifiedAt  DateTime?
+  failedLoginCount Int        @default(0)
+  lockedUntil      DateTime?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
 
   examinerProfile ExaminerProfile?
   otps            EmailOtp[]
   refreshTokens   RefreshToken[]
   exams           Exam[]
   payments        Payment[]
+  enrollments     Enrollment[]
+  attempts        Attempt[]
 
   @@index([role])
 }
@@ -102,9 +112,11 @@ model Exam {
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
 
-  examiner  User       @relation(fields: [examinerId], references: [id], onDelete: Restrict)
-  questions Question[]
-  payments  Payment[]
+  examiner    User         @relation(fields: [examinerId], references: [id], onDelete: Restrict)
+  questions   Question[]
+  payments    Payment[]
+  enrollments Enrollment[]
+  attempts    Attempt[]
 
   @@index([examinerId, createdAt])
   @@index([status])
@@ -206,8 +218,9 @@ model Payment {
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
 
-  user User  @relation(fields: [userId], references: [id], onDelete: Restrict)
-  exam Exam? @relation(fields: [examId], references: [id], onDelete: SetNull)
+  user       User        @relation(fields: [userId], references: [id], onDelete: Restrict)
+  exam       Exam?       @relation(fields: [examId], references: [id], onDelete: SetNull)
+  enrollment Enrollment?
 
   @@index([userId, createdAt])
   @@index([examId, purpose, status])
@@ -215,9 +228,81 @@ model Payment {
 
 // One row per gateway webhook event; the unique id makes redelivery harmless.
 model WebhookEvent {
-  id          String   @id @default(uuid()) @db.Uuid
-  provider    String
-  eventId     String   @unique
-  type        String
-  receivedAt  DateTime @default(now())
+  id         String   @id @default(uuid()) @db.Uuid
+  provider   String
+  eventId    String   @unique
+  type       String
+  receivedAt DateTime @default(now())
+}
+
+// A student's paid seat in an exam. Created when the join fee is captured.
+model Enrollment {
+  id        String   @id @default(uuid()) @db.Uuid
+  examId    String   @db.Uuid
+  studentId String   @db.Uuid
+  paymentId String?  @unique @db.Uuid
+  createdAt DateTime @default(now())
+
+  exam    Exam     @relation(fields: [examId], references: [id], onDelete: Restrict)
+  student User     @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  payment Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  attempt Attempt?
+
+  @@unique([examId, studentId])
+  @@index([studentId])
+}
+
+// One attempt per enrollment. The deadline is fixed by the server when the attempt starts.
+model Attempt {
+  id            String        @id @default(uuid()) @db.Uuid
+  enrollmentId  String        @unique @db.Uuid
+  examId        String        @db.Uuid
+  studentId     String        @db.Uuid
+  status        AttemptStatus @default(IN_PROGRESS)
+  startedAt     DateTime      @default(now())
+  deadlineAt    DateTime
+  submittedAt   DateTime?
+  // Why it ended: SUBMITTED_BY_STUDENT, TIME_UP, STRIKES.
+  endReason     String?
+  strikes       Int           @default(0)
+  // This student's own question order (ids) and option order per question (original indexes).
+  questionOrder Json
+  optionOrders  Json
+
+  enrollment Enrollment     @relation(fields: [enrollmentId], references: [id], onDelete: Restrict)
+  exam       Exam           @relation(fields: [examId], references: [id], onDelete: Restrict)
+  student    User           @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  answers    Answer[]
+  events     ProctorEvent[]
+
+  @@index([examId, status])
+  @@index([studentId])
+}
+
+model Answer {
+  id         String   @id @default(uuid()) @db.Uuid
+  attemptId  String   @db.Uuid
+  questionId String   @db.Uuid
+  // Choice questions: original option indexes. Subjective: text.
+  selected   Int[]
+  text       String?
+  flagged    Boolean  @default(false)
+  updatedAt  DateTime @updatedAt
+
+  attempt Attempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+
+  @@unique([attemptId, questionId])
+}
+
+model ProctorEvent {
+  id        String   @id @default(uuid()) @db.Uuid
+  attemptId String   @db.Uuid
+  type      String
+  // true when this event added a strike
+  strike    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  attempt Attempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+
+  @@index([attemptId, createdAt])
 }

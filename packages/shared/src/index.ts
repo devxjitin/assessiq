@@ -4,3 +4,4 @@ export * from './enums';
 export * from './exam';
 export * from './money';
 export * from './payment';
+export * from './attempt';

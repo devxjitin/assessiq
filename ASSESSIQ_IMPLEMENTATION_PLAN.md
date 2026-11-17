@@ -13,21 +13,21 @@ Legend: ✅ done · 🟡 partly done · ⬜ not started · ⛔ blocked
 
 ## Progress at a glance
 
-| Phase         | Sprint                                             | Status                       | Notes                                                                                                                                                                     |
-| ------------- | -------------------------------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| P0 Foundation | **S0** Setup                                       | ✅ Done (with open items)    | Monorepo, AWS staging, DNS/HTTPS, SES verified, deploy path proven. Open: GitHub Actions blocked by billing, Razorpay KYC, budget alerts, design/wireframes.              |
-| P1 Core MVP   | **S1** Identity                                    | ✅ Done, live on staging     | Accounts, email-code verification, login/refresh, password reset, roles, admin, audit log. 28 API tests.                                                                  |
-| P1 Core MVP   | **S2** Exam builder                                | ✅ Done, live on staging     | Draft exams, single/multi/subjective questions, bulk import, private logo, student preview. 19 new API tests.                                                             |
-| P1 Core MVP   | **S3** Creation payments                           | ✅ Done with a fake provider | Publish flow, signed verify + idempotent webhook, receipts, exam codes. Real Razorpay needs your TEST keys (code is written, not yet run against Razorpay). 18 new tests. |
-| P1 Core MVP   | S4 Join & take exam                                | ⬜ Next                      |                                                                                                                                                                           |
-| P1 Core MVP   | S5 Grading & results                               | ⬜                           |                                                                                                                                                                           |
-| P2            | S6 Coding engine · S7 Integrity                    | ⬜                           |                                                                                                                                                                           |
-| P3            | S8 Ledger/payouts · S9 Certificates · S10 Practice | ⬜                           |                                                                                                                                                                           |
-| P4            | S11 Admin & migration · S12 Launch                 | ⬜                           |                                                                                                                                                                           |
+| Phase         | Sprint                                             | Status                        | Notes                                                                                                                                                                     |
+| ------------- | -------------------------------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P0 Foundation | **S0** Setup                                       | ✅ Done (with open items)     | Monorepo, AWS staging, DNS/HTTPS, SES verified, deploy path proven. Open: GitHub Actions blocked by billing, Razorpay KYC, budget alerts, design/wireframes.              |
+| P1 Core MVP   | **S1** Identity                                    | ✅ Done, live on staging      | Accounts, email-code verification, login/refresh, password reset, roles, admin, audit log. 28 API tests.                                                                  |
+| P1 Core MVP   | **S2** Exam builder                                | ✅ Done, live on staging      | Draft exams, single/multi/subjective questions, bulk import, private logo, student preview. 19 new API tests.                                                             |
+| P1 Core MVP   | **S3** Creation payments                           | ✅ Done with a fake provider  | Publish flow, signed verify + idempotent webhook, receipts, exam codes. Real Razorpay needs your TEST keys (code is written, not yet run against Razorpay). 18 new tests. |
+| P1 Core MVP   | **S4** Join & take exam                            | ✅ Done locally, not deployed | Join by code + fee, server-timed attempt, shuffle, autosave, strikes. 24 new tests.                                                                                       |
+| P1 Core MVP   | S5 Grading & results                               | ⬜                            |                                                                                                                                                                           |
+| P2            | S6 Coding engine · S7 Integrity                    | ⬜                            |                                                                                                                                                                           |
+| P3            | S8 Ledger/payouts · S9 Certificates · S10 Practice | ⬜                            |                                                                                                                                                                           |
+| P4            | S11 Admin & migration · S12 Launch                 | ⬜                            |                                                                                                                                                                           |
 
-**Sprints done: 4 of 13 (S0 to S3; S3 runs on a fake payment provider until Razorpay test keys are added).** Overall, the identity layer and the whole deployment pipeline (to staging) are in place; trainers can build draft exams; payments, taking exams and certificates do not exist yet.
+**Sprints done: 5 of 13 (S0 to S3; S3 runs on a fake payment provider until Razorpay test keys are added).** Overall, the identity layer and the whole deployment pipeline (to staging) are in place; trainers can build draft exams; payments, taking exams and certificates do not exist yet.
 
-**What exists today:** a private-by-default API with login and roles, a web app with sign-up/sign-in/profile/admin user list, a Postgres database with migrations, AWS staging (VPC, EC2, RDS, S3, CloudFront, ECR, SES, IAM deploy role), HTTPS on both hostnames, and 75 passing automated tests.
+**What exists today:** a private-by-default API with login and roles, a web app with sign-up/sign-in/profile/admin user list, a Postgres database with migrations, AWS staging (VPC, EC2, RDS, S3, CloudFront, ECR, SES, IAM deploy role), HTTPS on both hostnames, and 99 passing automated tests.
 
 **Needs your action (cannot be done from code):**
 
@@ -336,10 +336,37 @@ Each sprint ends with a demo on `staging` and a short retro. "Done" means code r
 | **S1: Identity** ✅          | Secure accounts     | Sign-up/login for Student and Examiner, email OTP verification (SES), JWT + refresh, password reset, RBAC guards, profile pages, admin seed user, audit log base                                                                      | Passwords hashed (argon2id); unverified emails can't join or create exams; role guards covered by tests       |
 | **S2: Exam builder** ✅      | Build exams         | Exam CRUD (draft), settings (duration, window, pass %, shuffle, negative marks), **single + multi MCQ** and **subjective** editors, **logo upload** to S3, bulk import (ported parser, extended for multi-select), preview as student | Trainer builds a 100-question exam in under 10 minutes via import; logo stored privately                      |
 | **S3: Creation payments** ✅ | ₹199 to publish     | Razorpay Orders + Checkout, signature verification, **webhook handler** (idempotent), payment records, invoice/receipt email, exam code generation (crypto-random, e.g. `NVX-7K3P9Q`), share link/QR/WhatsApp                         | Exam can't be published without a captured payment; a duplicate webhook doesn't double-process                |
-| **S4: Join & take exam** ⬜ next | Student exam engine | Join by code → ₹149 payment → enrollment; exam lobby; **server-timed attempt**, per-student shuffle, autosave, navigator/flagging, submit/auto-submit; ported anti-cheat with server-side event logging and strike decision           | Answers survive a page refresh/network drop; late submissions rejected; the API never returns correct answers |
+| **S4: Join & take exam** ✅  | Student exam engine | Join by code → ₹149 payment → enrollment; exam lobby; **server-timed attempt**, per-student shuffle, autosave, navigator/flagging, submit/auto-submit; ported anti-cheat with server-side event logging and strike decision           | Answers survive a page refresh/network drop; late submissions rejected; the API never returns correct answers |
 | **S5: Grading & results** ⬜ | Results             | Auto-grade single/multi MCQ (all-or-nothing/partial), subjective grading screen with rubric and feedback, finalise results, student result page and scorecard, examiner dashboard (attempts, scores, violations), CSV export          | Grading math covered by unit tests; results hidden until finalised                                            |
 
-#### Sprint 3 completion report ✅ (fake payment provider; live on staging)
+#### Sprint 4 completion report ✅ (built and tested locally; **not yet deployed to staging**)
+
+| Scope item                     | Status      | Where / how                                                                                                                                                                                                                                    |
+| ------------------------------ | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Join by code                   | ✅          | `GET /join/:code` (rate limited; forgives case, spaces, missing dash); web `/join/`                                                                                                                                                            |
+| Join fee (₹149) and enrollment | ✅          | Same payment pipeline as publishing (order, signed verify, webhook); a captured join payment creates the enrollment exactly once; receipt email                                                                                                |
+| Seat limit and closed exams    | ✅          | Checked at order time and again at capture; a paid order with no seat is flagged in the audit log for a manual refund                                                                                                                          |
+| "My exams" and start/resume    | ✅          | `GET /me/enrollments`; dashboard list with Start / Resume                                                                                                                                                                                      |
+| Server-timed attempt           | ✅          | The server fixes the deadline (start + duration, capped at the closing time); the browser only displays a countdown. 3 s grace on saves; late writes rejected; an overdue attempt auto-submits the next time it is touched                     |
+| Per-student shuffle            | ✅          | Question and option order chosen by the server per student; answers are stored against the original option index                                                                                                                               |
+| Autosave, navigator, flagging  | ✅          | Debounced autosave with retry; answers survive reload; navigator shows answered and flagged                                                                                                                                                    |
+| Submit                         | ✅          | Confirm dialog, then locked; the attempt cannot be restarted                                                                                                                                                                                   |
+| Answers never leak             | ✅          | The attempt API never returns correct answers, explanations or rubrics (tested)                                                                                                                                                                |
+| Anti-cheat (ported)            | ✅ advisory | Fullscreen exit, tab hidden and window blur cost a strike (events within 2 s count once); copy, paste, right-click and devtools keys are blocked and logged; 3 strikes auto-submit. The server counts and decides; the browser can only report |
+| Tests                          | ✅          | **24 new API tests** (89 in the API, 99 in the repo); join, attempt, timing and strike flows also clicked through in a real browser                                                                                                            |
+
+**Acceptance criteria:** answers survive a page refresh ✅ (tested and seen in the browser); late submissions rejected ✅; the API never returns correct answers ✅.
+
+**Known gaps after Sprint 4:**
+
+- **Not deployed:** staging still runs Sprint 2. The AWS login expired; run `aws login`, then deploy Sprints 3 and 4 together.
+- Proctoring is advisory: a determined student can stop the browser reporting events (second device, modified client). The server cannot see the screen.
+- No sweeper yet: an attempt nobody opens again stays `IN_PROGRESS` until the grading sprint adds a job that auto-submits overdue attempts.
+- Grading and results are Sprint 5; a submitted student only sees "Exam submitted".
+- No "waiting room" countdown before the exam opens; students can join early but only start once it opens.
+- Students on a shared network are exempt from the per-IP rate limit on exam routes by design; login routes keep theirs.
+
+#### Sprint 3 completion report ✅ (fake payment provider; **not yet deployed to staging**)
 
 | Scope item                                        | Status               | Where / how                                                                                                                             |
 | ------------------------------------------------- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
@@ -361,8 +388,9 @@ Each sprint ends with a demo on `staging` and a short retro. "Done" means code r
 
 **Known gaps after Sprint 3:**
 
+- **Not deployed:** the AWS login expired during the staging deploy, so staging still runs Sprint 2. Re-run `aws login`, then deploy.
 - Real Razorpay has never been run: it needs your TEST key id/secret and a webhook, then one end-to-end test payment.
-- Staging currently uses the fake provider, so anyone with a trainer account can publish for free there.
+- Once deployed, staging will use the fake provider, so anyone with a trainer account can publish for free there.
 - No GST invoice, no refund flow, no QR code, no payment history page for trainers.
 - Verification emails still depend on SES production access, so a new trainer cannot register on staging with an arbitrary address yet.
 

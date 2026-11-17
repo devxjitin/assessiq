@@ -129,4 +129,33 @@ Exam creation fee: INR ${rupees} (inclusive of applicable taxes)
       ),
     });
   }
+
+  sendJoinReceipt(
+    to: string,
+    name: string,
+    r: {
+      examTitle: string;
+      startsAt: Date | null;
+      endsAt: Date | null;
+      receiptNo: string;
+      amountPaise: number;
+      paidAt: Date;
+    },
+  ) {
+    const rupees = (r.amountPaise / 100).toFixed(2);
+    const date = r.paidAt.toISOString().slice(0, 10);
+    const window =
+      r.startsAt && r.endsAt
+        ? `Opens ${r.startsAt.toISOString()} and closes ${r.endsAt.toISOString()} (UTC).`
+        : '';
+    return this.deliver({
+      to,
+      subject: `Receipt ${r.receiptNo}: you have joined "${r.examTitle}"`,
+      text: `Hi ${name},\n\nYou have joined "${r.examTitle}". ${window}\nSign in to AssessIQ to start the exam when it opens.\n\nReceipt ${r.receiptNo}, ${date}\nExam fee: INR ${rupees} (inclusive of applicable taxes)\n`,
+      html: layout(
+        'You have joined the exam',
+        `<p>Hi ${esc(name)}, you have joined <strong>${esc(r.examTitle)}</strong>. ${esc(window)} Sign in to AssessIQ to start the exam when it opens.</p><hr style="border:0;border-top:1px solid #ddd;margin:20px 0"><p style="font-size:14px">Receipt <strong>${esc(r.receiptNo)}</strong> · ${date}<br>Exam fee: INR ${rupees} (inclusive of applicable taxes)</p>`,
+      ),
+    });
+  }
 }

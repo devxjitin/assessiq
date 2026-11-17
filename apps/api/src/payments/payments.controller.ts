@@ -32,8 +32,16 @@ export class PaymentsController {
     return this.payments.createPublishOrder(user, id);
   }
 
+  /** Student: start (or resume) the join-fee order for an exam code. */
+  @Roles('STUDENT')
+  @Post('join/:code/order')
+  @HttpCode(200)
+  createJoinOrder(@CurrentUser() user: AuthUser, @Param('code') code: string) {
+    return this.payments.createJoinOrder(user, code);
+  }
+
   /** Step 2: the browser reports the gateway's result; the signature is checked server-side. */
-  @Roles('EXAMINER')
+  @Roles('EXAMINER', 'STUDENT')
   @Post('payments/verify')
   @HttpCode(200)
   verify(
@@ -44,7 +52,7 @@ export class PaymentsController {
   }
 
   /** Fake provider only: stands in for the gateway's checkout. 404 when real payments are on. */
-  @Roles('EXAMINER')
+  @Roles('EXAMINER', 'STUDENT')
   @Post('payments/fake/complete')
   @HttpCode(200)
   fakeComplete(

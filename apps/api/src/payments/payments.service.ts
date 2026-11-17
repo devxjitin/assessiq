@@ -15,6 +15,7 @@ import {
   type PublishResultDto,
   type VerifyPaymentInput,
 } from '@assessiq/shared';
+import { computeJoinState, normalizeCode } from '../enrollments/join-state';
 import { AuditService } from '../audit/audit.service';
 import type { AuthUser } from '../common/decorators';
 import { MailService } from '../mail/mail.service';
@@ -142,6 +143,19 @@ export class PaymentsService {
     if (!done || done.status !== 'CAPTURED') {
       throw new BadRequestException('Payment could not be confirmed');
     }
+    if (done.purpose === 'EXAM_JOIN') {
+      const enrollment = await this.prisma.enrollment.findUnique({ where: { paymentId: done.id } });
+      if (!enrollment || !done.examId) {
+        throw new ConflictException(
+          'Your payment was received but a seat could not be reserved. It will be refunded.',
+        );
+      }
+      return {
+        exam: { id: done.examId, status: 'PUBLISHED', code: null },
+        enrollmentId: enrollment.id,
+        receiptNo: formatReceiptNo(done.receiptNo),
+      };
+    }
     const exam = done.examId
       ? await this.prisma.exam.findUnique({
           where: { id: done.examId },
@@ -242,6 +256,7 @@ export class PaymentsService {
       });
       if (claimed.count === 0) return null;
 
+      if (payment.purpose === 'EXAM_JOIN') return this.enroll(tx, payment);
       if (!payment.examId) return { exam: null };
       const exam = await tx.exam.findUnique({ where: { id: payment.examId } });
       if (!exam || exam.status !== 'DRAFT') return { exam: exam ?? null };
@@ -266,7 +281,9 @@ export class PaymentsService {
         entityId: payment.id,
         meta: { via, examId: payment.examId },
       });
-      if (!published.exam) {
+      if (payment.purpose === 'EXAM_JOIN') {
+        await this.afterEnroll(payment.id, payment.userId, published, fresh);
+      } else if (!published.exam) {
         // Paid, but the exam was deleted meanwhile: flag for a manual refund.
         await this.audit.log({ action: 'payment.orphan', entity: 'Payment', entityId: payment.id });
       } else if (published.exam.code) {
@@ -283,5 +300,131 @@ export class PaymentsService {
       }
     }
     return fresh;
+  }
+
+  // ------------------------------------------------------------ join (students)
+
+  /** Starts (or resumes) the join-fee payment for a published exam. */
+  async createJoinOrder(user: AuthUser, rawCode: string): Promise<PublishOrderDto> {
+    const exam = await this.prisma.exam.findUnique({
+      where: { code: normalizeCode(rawCode) },
+      include: { _count: { select: { enrollments: true } } },
+    });
+    if (!exam || exam.status !== 'PUBLISHED') throw new NotFoundException('Exam code not found');
+    const enrolled = await this.prisma.enrollment.findUnique({
+      where: { examId_studentId: { examId: exam.id, studentId: user.id } },
+    });
+    const state = computeJoinState({
+      startsAt: exam.startsAt,
+      endsAt: exam.endsAt,
+      maxStudents: exam.maxStudents,
+      seatsTaken: exam._count.enrollments,
+      alreadyEnrolled: Boolean(enrolled),
+    });
+    if (state === 'ALREADY_ENROLLED')
+      throw new ConflictException('You have already joined this exam');
+    if (state === 'ENDED') throw new ConflictException('This exam has ended');
+    if (state === 'FULL') throw new ConflictException('This exam is full');
+
+    const existing = await this.prisma.payment.findFirst({
+      where: {
+        examId: exam.id,
+        userId: user.id,
+        purpose: 'EXAM_JOIN',
+        status: 'CREATED',
+        provider: this.provider.name,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    let orderId = existing?.providerOrderId;
+    if (!orderId) {
+      const order = await this.provider.createOrder({
+        amountPaise: PRICING.EXAM_JOIN_PAISE,
+        currency: PRICING.CURRENCY,
+        receipt: `join_${exam.id.slice(0, 8)}_${Date.now().toString(36)}`,
+      });
+      orderId = order.orderId;
+      await this.prisma.payment.create({
+        data: {
+          userId: user.id,
+          examId: exam.id,
+          purpose: 'EXAM_JOIN',
+          amountPaise: PRICING.EXAM_JOIN_PAISE,
+          currency: PRICING.CURRENCY,
+          provider: this.provider.name,
+          providerOrderId: orderId,
+        },
+      });
+      await this.audit.log({
+        actorId: user.id,
+        action: 'payment.order.join',
+        entity: 'Exam',
+        entityId: exam.id,
+      });
+    }
+    return {
+      provider: this.provider.name,
+      orderId,
+      amountPaise: PRICING.EXAM_JOIN_PAISE,
+      currency: PRICING.CURRENCY,
+      keyId: this.provider.publicKeyId,
+      description: `Join exam: ${exam.title}`.slice(0, 250),
+    };
+  }
+
+  /** Runs inside the capture transaction: takes a seat, or explains why it could not. */
+  private async enroll(
+    tx: Prisma.TransactionClient,
+    payment: { id: string; userId: string; examId: string | null },
+  ) {
+    const exam = payment.examId
+      ? await tx.exam.findUnique({ where: { id: payment.examId } })
+      : null;
+    if (!exam || exam.status !== 'PUBLISHED' || (exam.endsAt && exam.endsAt <= new Date())) {
+      return { exam, enrollment: null, reason: 'EXAM_UNAVAILABLE' };
+    }
+    const already = await tx.enrollment.findUnique({
+      where: { examId_studentId: { examId: exam.id, studentId: payment.userId } },
+    });
+    if (already) return { exam, enrollment: null, reason: 'DUPLICATE' };
+    const taken = await tx.enrollment.count({ where: { examId: exam.id } });
+    if (taken >= exam.maxStudents) return { exam, enrollment: null, reason: 'FULL' };
+    const enrollment = await tx.enrollment.create({
+      data: { examId: exam.id, studentId: payment.userId, paymentId: payment.id },
+    });
+    return { exam, enrollment, reason: null };
+  }
+
+  private async afterEnroll(
+    paymentId: string,
+    userId: string,
+    result: {
+      exam: { title: string; startsAt: Date | null; endsAt: Date | null } | null;
+      enrollment?: unknown;
+      reason?: string | null;
+    },
+    payment: { receiptNo: number; amountPaise: number; capturedAt: Date | null },
+  ) {
+    if (!result.enrollment || !result.exam) {
+      // Money taken but no seat: flag for a manual refund.
+      await this.audit.log({
+        action: 'payment.orphan',
+        entity: 'Payment',
+        entityId: paymentId,
+        meta: { reason: result.reason ?? 'UNKNOWN' },
+      });
+      return;
+    }
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (user) {
+      await this.mail.sendJoinReceipt(user.email, user.name, {
+        examTitle: result.exam.title,
+        startsAt: result.exam.startsAt,
+        endsAt: result.exam.endsAt,
+        receiptNo: formatReceiptNo(payment.receiptNo),
+        amountPaise: payment.amountPaise,
+        paidAt: payment.capturedAt ?? new Date(),
+      });
+    }
   }
 }

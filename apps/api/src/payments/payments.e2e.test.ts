@@ -214,7 +214,7 @@ describe('paying to publish', () => {
       .set(auth(other))
       .send({ orderId: o.orderId })
       .expect(404);
-    await ctx.http().post('/payments/verify').set(auth(student)).send(c).expect(403);
+    await ctx.http().post('/payments/verify').set(auth(student)).send(c).expect(404);
   });
 
   it('gives every exam its own code', async () => {
