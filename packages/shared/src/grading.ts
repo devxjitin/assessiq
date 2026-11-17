@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { CodeSubmissionDto } from './coding';
+import type { IntegrityDto, IntegrityFlagCode } from './integrity';
 
 /** Rounds to 2 decimals so partial credit never leaves float noise like 1.3333333. */
 export const round2 = (n: number): number => Math.round(n * 100) / 100;
@@ -84,7 +85,10 @@ export interface AttemptRowDto {
   violations: number;
   /** Subjective answers still waiting for marks. */
   pendingGrading: number;
+  /** Integrity signals worth a look (shared device, blocked second device, ...). */
+  flags: IntegrityFlagCode[];
   score: number | null;
+  maxScore: number | null;
   percent: number | null;
   passed: boolean | null;
 }
@@ -96,6 +100,8 @@ export interface ExamResultsDto {
     status: string;
     passPercent: number;
     totalMarks: number;
+    /** Question pool size per student, when the exam uses one. */
+    questionsPerStudent: number | null;
     enrolled: number;
   };
   stats: {
@@ -140,7 +146,10 @@ export interface GradingAttemptDto {
   status: string;
   endReason: string | null;
   strikes: number;
-  events: { type: string; strike: boolean; at: string }[];
+  events: { type: string; strike: boolean; at: string; ip: string | null }[];
+  integrity: IntegrityDto;
+  /** True when the exam gives each student a random subset of the questions. */
+  pooled: boolean;
   finalized: boolean;
   result: ResultSummaryDto | null;
   questions: GradingQuestionDto[];

@@ -41,6 +41,14 @@ npm run dev:worker
 
 Still open from Sprint 0: ESLint and commit hooks, design system and wireframes, production Terraform apply, working GitHub Actions (blocked by billing). See the plan file for full status.
 
+## Sprint 7: exam integrity (done locally)
+
+- **Question pools:** exam setting *Questions per student*; each student gets a random N of the questions and is marked out of those.
+- **One device per attempt:** the browser's device id (header `X-Device-Id`) is bound to a running attempt; another device gets `403 DEVICE_MISMATCH` until the trainer uses **Release device** (`POST /exams/:id/attempts/:attemptId/release-device`).
+- **Integrity report:** results table badges, and a report plus event timeline (with IPs) on the marking screen.
+- **Join-code limiter:** 8 wrong codes in 10 minutes pauses that student's lookups.
+- **Copied code check:** `GET /exams/:id/similarity?threshold=0.8` (trainer), shown on the results tab.
+
 ## Sprint 6: coding questions (done locally)
 
 - **Question type:** _Coding_ in the exam builder: statement, languages (Python, C, C++, Java, JavaScript), starter code, time and memory limits, test cases that are _sample_ (shown, runnable) or _hidden_ (grading only), each with a weight.

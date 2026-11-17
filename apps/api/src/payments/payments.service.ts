@@ -65,6 +65,9 @@ export class PaymentsService {
 
     const problems: string[] = [];
     if (exam._count.questions < 1) problems.push('Add at least one question.');
+    if (exam.questionsPerStudent && exam.questionsPerStudent > exam._count.questions) {
+      problems.push('Questions per student is more than the number of questions in the exam.');
+    }
     if (!exam.startsAt || !exam.endsAt) {
       problems.push('Set when the exam opens and closes (Settings tab).');
     } else {

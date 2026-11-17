@@ -36,9 +36,21 @@ export function Shell({ children, wide }: { children: React.ReactNode; wide?: bo
 }
 
 const AUTH_POINTS: { icon: IconName; title: string; text: string }[] = [
-  { icon: 'shield', title: 'Proctored, fair exams', text: 'Full-screen mode, tab-switch strikes and a violation timeline.' },
-  { icon: 'edit', title: 'MCQ, written and coding', text: 'Auto-graded choice and code questions, hand-marked written answers.' },
-  { icon: 'check', title: 'Verified certificates', text: 'Publish results and issue certificates after review.' },
+  {
+    icon: 'shield',
+    title: 'Proctored, fair exams',
+    text: 'Full-screen mode, tab-switch strikes and a violation timeline.',
+  },
+  {
+    icon: 'edit',
+    title: 'MCQ, written and coding',
+    text: 'Auto-graded choice and code questions, hand-marked written answers.',
+  },
+  {
+    icon: 'check',
+    title: 'Verified certificates',
+    text: 'Publish results and issue certificates after review.',
+  },
 ];
 
 /** Split layout for sign-in, sign-up and password pages: brand panel on the left, form on the right. */
@@ -49,7 +61,10 @@ function AuthShell({ children }: { children: React.ReactNode }) {
         <Brand light />
         <div className="auth-pitch">
           <h2>Run exams you can trust.</h2>
-          <p>Create, proctor and grade online exams and certifications, from a ten-question quiz to a coding test.</p>
+          <p>
+            Create, proctor and grade online exams and certifications, from a ten-question quiz to a
+            coding test.
+          </p>
           <ul>
             {AUTH_POINTS.map((p) => (
               <li key={p.title}>

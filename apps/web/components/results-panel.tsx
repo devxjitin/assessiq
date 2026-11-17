@@ -2,7 +2,13 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
-import type { ExamDetailDto, ExamResultsDto } from '@assessiq/shared';
+import {
+  FLAG_TEXT,
+  type ExamDetailDto,
+  type ExamResultsDto,
+  type IntegrityFlagCode,
+  type SimilarityReportDto,
+} from '@assessiq/shared';
 import { api, apiBlob } from '../lib/api';
 import { Alert, Button, StatCard, StatusBadge, describeError } from './ui';
 
@@ -16,6 +22,105 @@ function rowStatus(r: ExamResultsDto['rows'][number]) {
   if (r.status === 'RESULT_PUBLISHED')
     return <StatusBadge status="RESULTS_FINAL" label="Published" />;
   return <StatusBadge status="PUBLISHED" label="Marked" />;
+}
+
+const FLAG_LABEL: Record<IntegrityFlagCode, { text: string; kind: string }> = {
+  DEVICE_MISMATCH: { text: 'Other device blocked', kind: 'danger' },
+  SHARED_DEVICE: { text: 'Shared device', kind: 'warn' },
+  NETWORK_CHANGED: { text: 'Network changed', kind: 'info' },
+  NO_DEVICE_ID: { text: 'No device id', kind: 'warn' },
+};
+
+export function FlagBadges({ flags }: { flags: IntegrityFlagCode[] }) {
+  if (flags.length === 0) return <span className="muted">–</span>;
+  return (
+    <span style={{ display: 'inline-flex', gap: 6, flexWrap: 'wrap' }}>
+      {flags.map((f) => (
+        <span key={f} className={`badge badge-${FLAG_LABEL[f].kind}`} title={FLAG_TEXT[f]}>
+          {FLAG_LABEL[f].text}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+/** Pairs of coding answers that look copied from each other. Advisory: a person decides. */
+function SimilarityPanel({ examId }: { examId: string }) {
+  const [report, setReport] = useState<SimilarityReportDto | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  async function check() {
+    setBusy(true);
+    setError('');
+    try {
+      setReport(await api<SimilarityReportDto>(`/exams/${examId}/similarity`));
+    } catch (err) {
+      setError(describeError(err).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="card">
+      <h2 style={{ marginTop: 0 }}>Copied code check</h2>
+      <p className="muted">
+        Compares coding answers between students. Names, spacing and comments are ignored, so a
+        renamed copy still shows up. A high match is a reason to look, not proof: short or very
+        standard solutions can match by chance.
+      </p>
+      <Button variant="secondary" loading={busy} onClick={check}>
+        {report ? 'Check again' : 'Check for copied code'}
+      </Button>
+      {error && <Alert>{error}</Alert>}
+      {report?.questions.map((q) => (
+        <div key={q.questionId} style={{ marginTop: 16 }}>
+          <strong>Question {q.number}</strong>{' '}
+          <span className="muted">
+            {q.body} · {q.compared} answers compared
+          </span>
+          {q.pairs.length === 0 ? (
+            <p className="muted">
+              No pairs at {Math.round(report.threshold * 100)}% or more alike.
+            </p>
+          ) : (
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Alike</th>
+                    <th>Student</th>
+                    <th>Student</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {q.pairs.map((p) => (
+                    <tr key={p.a.attemptId + p.b.attemptId}>
+                      <td>
+                        <StatusBadge
+                          status={p.similarity >= 95 ? 'SUSPENDED' : 'PAYMENT_PENDING'}
+                          label={`${p.similarity}%`}
+                        />
+                      </td>
+                      {[p.a, p.b].map((s) => (
+                        <td key={s.attemptId}>
+                          <Link href={`/exams/grade/?exam=${examId}&attempt=${s.attemptId}`}>
+                            {s.name}
+                          </Link>
+                          <div className="muted">{s.email}</div>
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      ))}
+    </section>
+  );
 }
 
 export function ResultsPanel({
@@ -58,6 +163,21 @@ export function ResultsPanel({
       setError(describeError(err).message);
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function release(attemptId: string, name: string) {
+    if (
+      !window.confirm(
+        `Let ${name} continue this exam on a different device? The device they are using now will be locked out.`,
+      )
+    )
+      return;
+    try {
+      await api(`/exams/${exam.id}/attempts/${attemptId}/release-device`, { method: 'POST' });
+      await load();
+    } catch (err) {
+      setError(describeError(err).message);
     }
   }
 
@@ -109,6 +229,12 @@ export function ResultsPanel({
       </div>
 
       {error && <Alert>{error}</Alert>}
+      {data.exam.questionsPerStudent && (
+        <Alert kind="info">
+          Question pool: each student gets {data.exam.questionsPerStudent} random questions, so
+          totals shown here are for a typical student.
+        </Alert>
+      )}
       {data.finalized ? (
         <Alert kind="success">Results are published. Students can see their scores.</Alert>
       ) : stats.pendingGrading > 0 ? (
@@ -150,6 +276,7 @@ export function ResultsPanel({
                 <th>Result</th>
                 <th>Strikes</th>
                 <th>Events</th>
+                <th>Integrity</th>
                 <th />
               </tr>
             </thead>
@@ -163,7 +290,7 @@ export function ResultsPanel({
                   <td>{rowStatus(r)}</td>
                   <td>{when(r.submittedAt)}</td>
                   <td>
-                    {r.score === null ? '–' : `${r.score} / ${data.exam.totalMarks}`}
+                    {r.score === null ? '–' : `${r.score} / ${r.maxScore ?? data.exam.totalMarks}`}
                     {r.percent !== null && <div className="muted">{r.percent}%</div>}
                   </td>
                   <td>
@@ -179,6 +306,17 @@ export function ResultsPanel({
                   <td>{r.strikes}</td>
                   <td>{r.violations}</td>
                   <td>
+                    <FlagBadges flags={r.flags} />
+                  </td>
+                  <td>
+                    {r.status === 'IN_PROGRESS' && (
+                      <Button
+                        variant="secondary"
+                        onClick={() => void release(r.attemptId, r.studentName)}
+                      >
+                        Release device
+                      </Button>
+                    )}
                     {r.status !== 'IN_PROGRESS' && (
                       <Link
                         className="btn btn-secondary btn-small btn-link"
@@ -194,6 +332,8 @@ export function ResultsPanel({
           </table>
         </div>
       )}
+
+      {exam.questions.some((q) => q.type === 'CODING') && <SimilarityPanel examId={exam.id} />}
     </div>
   );
 }

@@ -68,6 +68,7 @@ export class ExamsService {
         shuffleQuestions: input.shuffleQuestions,
         shuffleOptions: input.shuffleOptions,
         maxStudents: input.maxStudents,
+        questionsPerStudent: input.questionsPerStudent,
       },
       include: { questions: true },
     });
@@ -127,6 +128,7 @@ export class ExamsService {
         shuffleQuestions: input.shuffleQuestions,
         shuffleOptions: input.shuffleOptions,
         maxStudents: input.maxStudents,
+        questionsPerStudent: input.questionsPerStudent,
       },
       include: { questions: { orderBy: { position: 'asc' } } },
     });
@@ -472,6 +474,7 @@ export class ExamsService {
       shuffleQuestions: exam.shuffleQuestions,
       shuffleOptions: exam.shuffleOptions,
       maxStudents: exam.maxStudents,
+      questionsPerStudent: exam.questionsPerStudent,
       hasLogo: Boolean(exam.logoKey),
       code: exam.code,
       publishedAt: exam.publishedAt?.toISOString() ?? null,

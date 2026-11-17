@@ -25,6 +25,7 @@ export interface ExamSettingsValues {
   shuffleQuestions: boolean;
   shuffleOptions: boolean;
   maxStudents: number;
+  questionsPerStudent: number | null;
 }
 
 export function ExamSettingsForm({
@@ -55,6 +56,9 @@ export function ExamSettingsForm({
       shuffleQuestions: f.get('shuffleQuestions') === 'on',
       shuffleOptions: f.get('shuffleOptions') === 'on',
       maxStudents: Number(f.get('maxStudents')),
+      questionsPerStudent: String(f.get('questionsPerStudent') ?? '').trim()
+        ? Number(f.get('questionsPerStudent'))
+        : null,
     };
     const result = validate(createExamSchema, candidate);
     setSaved(false);
@@ -162,6 +166,24 @@ export function ExamSettingsForm({
             max={1000}
             defaultValue={initial?.maxStudents ?? 1000}
             error={errors.maxStudents}
+          />
+        </section>
+
+        <section className="form-section">
+          <h3>Question pool</h3>
+          <p className="card-sub">
+            Give every student a different random set of questions out of a bigger bank. Leave empty
+            to give everyone all questions. Use questions with the same marks so scores stay fair.
+          </p>
+          <Field
+            label="Questions per student"
+            name="questionsPerStudent"
+            type="number"
+            min={1}
+            max={300}
+            placeholder="All questions"
+            defaultValue={initial?.questionsPerStudent ?? ''}
+            error={errors.questionsPerStudent}
           />
         </section>
 

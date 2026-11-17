@@ -21,11 +21,11 @@ Legend: ✅ done · 🟡 partly done · ⬜ not started · ⛔ blocked
 | P1 Core MVP   | **S3** Creation payments                           | ✅ Done with a fake provider                 | Publish flow, signed verify + idempotent webhook, receipts, exam codes. Real Razorpay needs your TEST keys (code is written, not yet run against Razorpay). 18 new tests. |
 | P1 Core MVP   | **S4** Join & take exam                            | ✅ Done, on staging                          | Join by code + fee, server-timed attempt, shuffle, autosave, strikes. 24 new tests.                                                                                       |
 | P1 Core MVP   | **S5** Grading & results                           | ✅ Done locally, not deployed                | Auto-marking, partial credit, written-answer marking, publish results, CSV. 36 new tests.                                                                                 |
-| P2            | **S6** Coding engine · S7 Integrity                | S6 ✅ done locally, not deployed; S7 ⬜ next | S6: coding questions, Judge0 sandbox, run on samples, auto-grading. 35 new tests (13 live).                                                                               |
+| P2            | **S6** Coding engine · **S7** Integrity            | S6, S7 ✅ done locally; S6 deployed, S7 not yet | S7: question pools, one device per attempt, integrity report, join-code limiter, copied-code check. 22 new tests. |
 | P3            | S8 Ledger/payouts · S9 Certificates · S10 Practice | ⬜                                           |                                                                                                                                                                           |
 | P4            | S11 Admin & migration · S12 Launch                 | ⬜                                           |                                                                                                                                                                           |
 
-**Sprints done: 7 of 13 (S0 to S6; S3 runs on a fake payment provider until Razorpay test keys are added).** Overall, the identity layer and the whole deployment pipeline (to staging) are in place; trainers can build draft exams; payments, taking exams and certificates do not exist yet.
+**Sprints done: 8 of 13 (S0 to S7; S3 runs on a fake payment provider until Razorpay test keys are added).** Overall, the identity layer and the whole deployment pipeline (to staging) are in place; trainers can build draft exams; payments, taking exams and certificates do not exist yet.
 
 **What exists today:** a private-by-default API with login and roles, a web app with sign-up/sign-in/profile/admin user list, a Postgres database with migrations, AWS staging (VPC, EC2, RDS, S3, CloudFront, ECR, SES, IAM deploy role), HTTPS on both hostnames, and 99 passing automated tests.
 
@@ -339,7 +339,38 @@ Each sprint ends with a demo on `staging` and a short retro. "Done" means code r
 | **S4: Join & take exam** ✅  | Student exam engine | Join by code → ₹149 payment → enrollment; exam lobby; **server-timed attempt**, per-student shuffle, autosave, navigator/flagging, submit/auto-submit; ported anti-cheat with server-side event logging and strike decision           | Answers survive a page refresh/network drop; late submissions rejected; the API never returns correct answers |
 | **S5: Grading & results** ✅ | Results             | Auto-grade single/multi MCQ (all-or-nothing/partial), subjective grading screen with rubric and feedback, finalise results, student result page and scorecard, examiner dashboard (attempts, scores, violations), CSV export          | Grading math covered by unit tests; results hidden until finalised                                            |
 
-#### Sprint 6 completion report ✅ (built and tested locally against a real Judge0; **not yet deployed**, and the code-execution host is **not created yet**)
+#### Sprint 7 completion report ✅ (built and tested locally; **not yet deployed**)
+
+| Scope item | Status | Where / how |
+| --- | --- | --- |
+| Shuffle questions and options per student | ✅ (done in Sprint 4) | Each attempt stores its own question and option order |
+| Question pools (random N of M) | ✅ | New setting **Questions per student** on the exam. Each student gets a random N; only those are shown, marked and counted in their maximum score. Publishing is refused if N is more than the number of questions. Students see the pool size before paying |
+| One device per attempt | ✅ | The web app keeps a random device id in the browser and sends it with every request. The first device that talks to a running attempt owns it; another device gets a clear "already open on another device" error on every call (load, save, run, submit, events). Same device: reload and a second tab are fine. The trainer's **Release device** button lets the student continue elsewhere |
+| IP and device record | ✅ | Per attempt: IP at start and last IP, browser string, device id; each proctor event also stores the IP |
+| Violation timeline and report | ✅ | The marking screen has an **Integrity report**: flags in plain language, where it started and last seen, shared-device students, and a timeline of events with IPs. The results table has an Integrity column with badges |
+| Join code rate limits | ✅ | Wrong codes are counted per student: 8 misses in 10 minutes pauses lookups (429) for that student, on top of the existing 30 per minute per IP. Right codes never count |
+| Plagiarism check on coding answers | ✅ | **Copied code check** on the results tab: token 5-gram similarity between students (comments, spacing, variable names and literal values ignored; starter code ignored; same language only; tiny programs skipped). Pairs at 80% or more are listed per question with links to both answers |
+| Tests | ✅ | **15 API tests** (devices, release, shared device, pools and marking, join limiter, similarity) and **7 shared tests**; repo total 179 regular tests |
+
+**What the flags mean (advisory, never automatic penalties):** *Other device blocked* (a second device tried this attempt), *Shared device* (two students used the same browser), *Network changed* (IP at start differs from the latest; common on phones), *No device id* (the browser did not send one).
+
+**Findings worth knowing:**
+
+- Device binding stops casual sharing and logging in from a second machine. It is **not tamper-proof**: a student can clear browser storage or use another browser profile *before* starting, and a script can omit the id (the attempt is then simply flagged *No device id* and binds to the first request that sends one).
+- Many students on one network (a classroom) share an IP, so IP alone proves nothing; that is why only a *change* of IP is flagged, and only as information.
+- With a pool, marks per question should be equal, otherwise some students get a harder paper. Totals shown to the trainer are for a "typical" student; each student's own maximum is exact.
+- The similarity check cannot tell copying from two people writing the same short, standard solution; the trainer decides. It runs when asked (not in the background) and compares up to 600 answers per question and language.
+- One session per attempt is enforced per *device*, not per tab: two tabs on the same device both work.
+
+**Acceptance criteria:** a second device cannot continue the same attempt ✅; the examiner sees a per-student violation report ✅. Not browser-tested end to end by hand (API behaviour is covered by tests; the new web screens compile and build).
+
+**Known gaps after Sprint 7:**
+
+- Not deployed yet; staging runs Sprint 6.
+- No webcam or screen proctoring, no IP allow-lists, no live "who is online" view.
+- Similarity checks only coding answers, and only within one exam.
+
+#### Sprint 6 completion report ✅ (tested locally against a real Judge0; deployed to staging on 2026-11-17, but the code-execution host is **not created yet**)
 
 | Scope item               | Status                     | Where / how                                                                                                                                                                                                                                                                                                                                                                                              |
 | ------------------------ | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -368,7 +399,7 @@ Each sprint ends with a demo on `staging` and a short retro. "Done" means code r
 - No plagiarism check yet (Sprint 7). No custom checkers: output is compared as text.
 - Java must use a class called `Main`; input is read from stdin only.
 
-#### Sprint 5 completion report ✅ (built and tested locally; **not yet deployed to staging**)
+#### Sprint 5 completion report ✅ (deployed to staging on 2026-11-17)
 
 | Scope item                       | Status | Where / how                                                                                                                                                                                                                                                                                                          |
 | -------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -509,7 +540,7 @@ Each sprint ends with a demo on `staging` and a short retro. "Done" means code r
 | Sprint                      | Goal       | Scope                                                                                                                                                                                                                                                                       | Acceptance criteria                                                                                                                     |
 | --------------------------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
 | **S6: Coding engine** ✅    | Coding Qs  | Judge0 on EC2 (Docker, network disabled, CPU/memory limits); coding question editor (statement, languages, starter code, sample + hidden tests, weights, limits); Monaco editor for students with "Run on samples"; worker grading via queue; per-test results              | Python, C, C++, Java and JavaScript work; an infinite loop/fork bomb is killed within limits; 50 concurrent runs queue without crashing |
-| **S7: Integrity hardening** | Fair exams | Question/option shuffle per student, question pools (random N of M), IP/device fingerprint per attempt, one active session per attempt, violation timeline for examiners, rate limits on join codes, plagiarism check on coding answers (token similarity between students) | A second device can't continue the same attempt; the examiner sees a per-student violation report                                       |
+| **S7: Integrity hardening** ✅ | Fair exams | Question/option shuffle per student, question pools (random N of M), IP/device fingerprint per attempt, one active session per attempt, violation timeline for examiners, rate limits on join codes, plagiarism check on coding answers (token similarity between students) | A second device can't continue the same attempt; the examiner sees a per-student violation report                                       |
 
 ### Phase 3: Monetisation, practice & certificates (Sprints 8–10, weeks 17–22)
 

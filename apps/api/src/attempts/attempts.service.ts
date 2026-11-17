@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  ForbiddenException,
   HttpException,
   HttpStatus,
   Inject,
@@ -24,7 +25,7 @@ import {
   type SaveAnswerInput,
 } from '@assessiq/shared';
 import { AuditService } from '../audit/audit.service';
-import type { AuthUser } from '../common/decorators';
+import type { AuthUser, ClientInfo } from '../common/decorators';
 import { GRACE_MS } from '../common/timing';
 import { PrismaService } from '../prisma/prisma.service';
 import { CODE_RUNNER, CodeRunner } from '../code/code-runner';
@@ -57,7 +58,7 @@ export class AttemptsService {
   // ------------------------------------------------------------------ start
 
   /** Starts the student's attempt, or returns the one already running. */
-  async start(user: AuthUser, enrollmentId: string): Promise<AttemptDto> {
+  async start(user: AuthUser, enrollmentId: string, client: ClientInfo): Promise<AttemptDto> {
     const enrollment = await this.prisma.enrollment.findFirst({
       where: { id: enrollmentId, studentId: user.id },
       include: {
@@ -66,7 +67,7 @@ export class AttemptsService {
       },
     });
     if (!enrollment) throw new NotFoundException('Enrollment not found');
-    if (enrollment.attempt) return this.view(user, enrollment.attempt.id);
+    if (enrollment.attempt) return this.view(user, enrollment.attempt.id, client);
 
     const { exam } = enrollment;
     const now = new Date();
@@ -78,10 +79,15 @@ export class AttemptsService {
     const byDuration = new Date(now.getTime() + exam.durationMinutes * 60_000);
     const deadlineAt = exam.endsAt && exam.endsAt < byDuration ? exam.endsAt : byDuration;
 
-    const ids = exam.questions.map((q) => q.id);
+    // Question pool: each student gets a random N of the exam's questions.
+    const all = exam.questions.map((q) => q.id);
+    const pool = exam.questionsPerStudent;
+    const chosen = pool && pool < all.length ? new Set(shuffled(all).slice(0, pool)) : null;
+    const ids = chosen ? all.filter((id) => chosen.has(id)) : all;
     const questionOrder = exam.shuffleQuestions ? shuffled(ids) : ids;
     const optionOrders: Record<string, number[]> = {};
     for (const q of exam.questions) {
+      if (chosen && !chosen.has(q.id)) continue;
       if (q.type === 'SINGLE' || q.type === 'MULTI') {
         const idx = q.options.map((_, i) => i);
         optionOrders[q.id] = exam.shuffleOptions ? shuffled(idx) : idx;
@@ -99,6 +105,10 @@ export class AttemptsService {
           deadlineAt,
           questionOrder,
           optionOrders,
+          deviceId: client.deviceId,
+          startIp: client.ip,
+          lastIp: client.ip,
+          userAgent: client.userAgent,
         },
       });
       attemptId = created.id;
@@ -119,13 +129,13 @@ export class AttemptsService {
         throw err;
       }
     }
-    return this.view(user, attemptId);
+    return this.view(user, attemptId, client);
   }
 
   // ------------------------------------------------------------------- read
 
-  async view(user: AuthUser, attemptId: string): Promise<AttemptDto> {
-    const attempt = await this.load(user, attemptId);
+  async view(user: AuthUser, attemptId: string, client: ClientInfo): Promise<AttemptDto> {
+    const attempt = await this.load(user, attemptId, client);
     const exam = await this.prisma.exam.findUniqueOrThrow({
       where: { id: attempt.examId },
       include: { questions: true },
@@ -192,8 +202,9 @@ export class AttemptsService {
     attemptId: string,
     questionId: string,
     input: SaveAnswerInput,
+    client: ClientInfo,
   ): Promise<{ saved: true }> {
-    const attempt = await this.load(user, attemptId);
+    const attempt = await this.load(user, attemptId, client);
     this.assertWritable(attempt);
 
     const order = attempt.questionOrder as string[];
@@ -251,8 +262,9 @@ export class AttemptsService {
     attemptId: string,
     questionId: string,
     input: RunCodeInput,
+    client: ClientInfo,
   ): Promise<RunResultDto> {
-    const attempt = await this.load(user, attemptId);
+    const attempt = await this.load(user, attemptId, client);
     this.assertWritable(attempt);
     if (!UUID.test(questionId) || !(attempt.questionOrder as string[]).includes(questionId)) {
       throw new NotFoundException('Question not found');
@@ -342,8 +354,8 @@ export class AttemptsService {
 
   // ----------------------------------------------------------------- submit
 
-  async submit(user: AuthUser, attemptId: string): Promise<AttemptDto> {
-    const attempt = await this.load(user, attemptId);
+  async submit(user: AuthUser, attemptId: string, client: ClientInfo): Promise<AttemptDto> {
+    const attempt = await this.load(user, attemptId, client);
     if (attempt.status === 'IN_PROGRESS') {
       this.assertWritable(attempt);
       await this.prisma.attempt.updateMany({
@@ -358,7 +370,7 @@ export class AttemptsService {
         entityId: attemptId,
       });
     }
-    return this.view(user, attemptId);
+    return this.view(user, attemptId, client);
   }
 
   // ---------------------------------------------------------------- proctor
@@ -368,8 +380,13 @@ export class AttemptsService {
    * client cannot lower their strikes, only stop reporting them (which is why this is
    * advisory evidence for the trainer, not proof).
    */
-  async recordEvent(user: AuthUser, attemptId: string, input: ProctorEventInput) {
-    const attempt = await this.load(user, attemptId);
+  async recordEvent(
+    user: AuthUser,
+    attemptId: string,
+    input: ProctorEventInput,
+    client: ClientInfo,
+  ) {
+    const attempt = await this.load(user, attemptId, client);
     if (attempt.status !== 'IN_PROGRESS') {
       return { strikes: attempt.strikes, ended: true, status: attempt.status };
     }
@@ -382,7 +399,9 @@ export class AttemptsService {
       });
       strike = !last || now.getTime() - last.createdAt.getTime() > STRIKE_DEBOUNCE_MS;
     }
-    await this.prisma.proctorEvent.create({ data: { attemptId, type: input.type, strike } });
+    await this.prisma.proctorEvent.create({
+      data: { attemptId, type: input.type, strike, ip: client.ip, deviceId: client.deviceId },
+    });
 
     let strikes = attempt.strikes;
     let status: string = attempt.status;
@@ -413,12 +432,56 @@ export class AttemptsService {
   // ---------------------------------------------------------------- helpers
 
   /** Loads the caller's own attempt and applies the time limit if it has run out. */
-  private async load(user: AuthUser, attemptId: string): Promise<Attempt> {
+  private async load(user: AuthUser, attemptId: string, client: ClientInfo): Promise<Attempt> {
     const attempt = UUID.test(attemptId)
       ? await this.prisma.attempt.findFirst({ where: { id: attemptId, studentId: user.id } })
       : null;
     if (!attempt) throw new NotFoundException('Attempt not found');
-    return this.settle(attempt);
+    const current = await this.settle(attempt);
+    await this.guardDevice(current, client);
+    return current;
+  }
+
+  /**
+   * One device per attempt. The first device that talks to a running attempt owns it; another
+   * device is refused (and recorded) until the trainer releases the attempt. The same device may
+   * reload or open a second tab. Finished attempts can be read from anywhere.
+   */
+  private async guardDevice(attempt: Attempt, client: ClientInfo): Promise<void> {
+    if (attempt.status !== 'IN_PROGRESS') return;
+    if (attempt.deviceId && client.deviceId !== attempt.deviceId) {
+      const recent = await this.prisma.proctorEvent.findFirst({
+        where: { attemptId: attempt.id, type: 'DEVICE_MISMATCH' },
+        orderBy: { createdAt: 'desc' },
+      });
+      if (!recent || Date.now() - recent.createdAt.getTime() > 30_000) {
+        await this.prisma.proctorEvent.create({
+          data: {
+            attemptId: attempt.id,
+            type: 'DEVICE_MISMATCH',
+            strike: false,
+            ip: client.ip,
+            deviceId: client.deviceId,
+          },
+        });
+      }
+      throw new ForbiddenException({
+        statusCode: 403,
+        code: 'DEVICE_MISMATCH',
+        message:
+          'This exam is already open on another device. Ask your trainer to release it if you need to switch.',
+      });
+    }
+    const patch: Prisma.AttemptUpdateManyMutationInput = {};
+    if (!attempt.deviceId && client.deviceId) patch.deviceId = client.deviceId;
+    if (client.ip && client.ip !== attempt.lastIp) patch.lastIp = client.ip;
+    if (Object.keys(patch).length) {
+      // Binding is conditional so two first requests cannot both claim the attempt.
+      await this.prisma.attempt.updateMany({
+        where: { id: attempt.id, ...(patch.deviceId ? { deviceId: null } : {}) },
+        data: patch,
+      });
+    }
   }
 
   /** Auto-submits an attempt whose time is up. Lazy, so no timer has to be running. */

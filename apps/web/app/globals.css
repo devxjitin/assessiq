@@ -1074,3 +1074,18 @@ tbody tr:last-child td {
     min-height: 100vh;
   }
 }
+
+/* key / value list (integrity report) */
+.kv {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 16px;
+  margin: 12px 0;
+}
+.kv dt {
+  color: var(--muted);
+}
+.kv dd {
+  margin: 0;
+  word-break: break-word;
+}

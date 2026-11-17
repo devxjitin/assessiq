@@ -66,9 +66,11 @@ export default function AttemptPage() {
       })
       .catch((err) =>
         setFatal(
-          err instanceof ApiError && err.status === 404
-            ? 'This exam attempt was not found.'
-            : 'Could not load the exam. Check your connection and refresh.',
+          err instanceof ApiError && err.code === 'DEVICE_MISMATCH'
+            ? err.message
+            : err instanceof ApiError && err.status === 404
+              ? 'This exam attempt was not found.'
+              : 'Could not load the exam. Check your connection and refresh.',
         ),
       );
   }, [id, user]);
@@ -91,6 +93,10 @@ export default function AttemptPage() {
         if (err instanceof ApiError && err.status === 409) {
           // The attempt ended on the server (time up or strikes). Reload to show the result.
           window.location.reload();
+          return;
+        }
+        if (err instanceof ApiError && err.code === 'DEVICE_MISMATCH') {
+          setFatal(err.message);
           return;
         }
         failed = true;

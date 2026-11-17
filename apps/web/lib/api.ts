@@ -30,8 +30,27 @@ interface Options {
   auth?: boolean;
 }
 
+/**
+ * A random id for this browser, kept in localStorage. The server ties a running exam attempt to
+ * it, so the attempt cannot be carried on from a second device by accident or on purpose.
+ */
+export function deviceId(): string {
+  try {
+    let id = localStorage.getItem('aiq-device');
+    if (!id || !/^[A-Za-z0-9_-]{16,64}$/.test(id)) {
+      id = crypto.randomUUID();
+      localStorage.setItem('aiq-device', id);
+    }
+    return id;
+  } catch {
+    return '';
+  }
+}
+
 async function send(path: string, { method = 'GET', body, auth = true }: Options) {
   const headers: Record<string, string> = {};
+  const device = typeof window === 'undefined' ? '' : deviceId();
+  if (device) headers['X-Device-Id'] = device;
   const isForm = typeof FormData !== 'undefined' && body instanceof FormData;
   if (body !== undefined && !isForm) headers['Content-Type'] = 'application/json';
   if (auth && accessToken) headers.Authorization = `Bearer ${accessToken}`;

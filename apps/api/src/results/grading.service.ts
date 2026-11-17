@@ -27,7 +27,11 @@ export class GradingService {
     const awarded: number[] = [];
     let pending = 0;
 
-    for (const q of attempt.exam.questions) {
+    // With a question pool, only the questions this student was given count.
+    const given = new Set(attempt.questionOrder as string[]);
+    const questions = attempt.exam.questions.filter((q) => given.has(q.id));
+
+    for (const q of questions) {
       const a = byQuestion.get(q.id);
       if (q.type !== 'SINGLE' && q.type !== 'MULTI') {
         // Written answers (coding questions will join them in a later sprint).
@@ -78,7 +82,7 @@ export class GradingService {
     }
 
     if (pending === 0) {
-      const maxScore = attempt.exam.questions.reduce((s, q) => s + q.marks, 0);
+      const maxScore = questions.reduce((s, q) => s + q.marks, 0);
       const result = summarize({ awarded, maxScore, passPercent: attempt.exam.passPercent });
       writes.push(
         this.prisma.attempt.update({

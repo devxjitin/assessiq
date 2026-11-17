@@ -1,7 +1,12 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import type { CodeSubmission } from '@prisma/client';
 import {
+  INTEGRITY,
+  findSimilar,
+  integrityFlags,
   round2,
+  type CodingSpec,
+  type SimilarityReportDto,
   type CodeSubmissionDto,
   type GradedTest,
   type AttemptRowDto,
@@ -84,9 +89,14 @@ export class ResultsService {
       include: {
         student: { select: { name: true, email: true } },
         answers: { where: { questionId: { in: writtenIds } } },
+        events: { where: { type: 'DEVICE_MISMATCH' }, select: { id: true } },
         _count: { select: { events: true } },
       },
     });
+    const devices = new Map<string, number>();
+    for (const a of attempts) {
+      if (a.deviceId) devices.set(a.deviceId, (devices.get(a.deviceId) ?? 0) + 1);
+    }
     const enrolled = await this.prisma.enrollment.count({ where: { examId: exam.id } });
 
     const rows: AttemptRowDto[] = attempts.map((a) => ({
@@ -100,7 +110,15 @@ export class ResultsService {
       strikes: a.strikes,
       violations: a._count.events,
       pendingGrading: a.answers.filter((x) => x.text?.trim() && x.marksAwarded === null).length,
+      flags: integrityFlags({
+        hasDeviceId: Boolean(a.deviceId),
+        sharedDeviceCount: a.deviceId ? (devices.get(a.deviceId) ?? 1) - 1 : 0,
+        mismatchEvents: a.events.length,
+        startIp: a.startIp,
+        lastIp: a.lastIp,
+      }).map((x) => x.code),
       score: a.score,
+      maxScore: a.maxScore,
       percent: a.percent,
       passed: a.passed,
     }));
@@ -112,7 +130,8 @@ export class ResultsService {
         title: exam.title,
         status: exam.status,
         passPercent: exam.passPercent,
-        totalMarks: round2(exam.questions.reduce((s, q) => s + q.marks, 0)),
+        totalMarks: this.totalFor(exam),
+        questionsPerStudent: exam.questionsPerStudent,
         enrolled,
       },
       stats: {
@@ -158,6 +177,29 @@ export class ResultsService {
 
     const byQuestion = new Map(attempt.answers.map((a) => [a.questionId, a]));
     const jobs = new Map(attempt.codeJobs.map((j) => [j.questionId, j]));
+    // Only the questions this student was given (a question pool gives each student a subset).
+    const given = new Set(attempt.questionOrder as string[]);
+    const asked = exam.questions.filter((q) => given.has(q.id));
+    const sharing = attempt.deviceId
+      ? await this.prisma.attempt.findMany({
+          where: { examId: exam.id, deviceId: attempt.deviceId, id: { not: attempt.id } },
+          select: { student: { select: { name: true, email: true } } },
+        })
+      : [];
+    const integrity = {
+      startIp: attempt.startIp,
+      lastIp: attempt.lastIp,
+      userAgent: attempt.userAgent,
+      hasDeviceId: Boolean(attempt.deviceId),
+      sharedWith: sharing.map((x) => x.student),
+      flags: integrityFlags({
+        hasDeviceId: Boolean(attempt.deviceId),
+        sharedDeviceCount: sharing.length,
+        mismatchEvents: attempt.events.filter((e) => e.type === 'DEVICE_MISMATCH').length,
+        startIp: attempt.startIp,
+        lastIp: attempt.lastIp,
+      }),
+    };
     return {
       attemptId: attempt.id,
       examId: exam.id,
@@ -170,7 +212,10 @@ export class ResultsService {
         type: e.type,
         strike: e.strike,
         at: e.createdAt.toISOString(),
+        ip: e.ip,
       })),
+      integrity,
+      pooled: asked.length < exam.questions.length,
       finalized: exam.status === 'RESULTS_FINAL',
       result:
         attempt.score !== null
@@ -181,7 +226,7 @@ export class ResultsService {
               passed: Boolean(attempt.passed),
             }
           : null,
-      questions: exam.questions.map((q, i) => {
+      questions: asked.map((q, i) => {
         const a = byQuestion.get(q.id);
         const written = q.type === 'SUBJECTIVE' || q.type === 'CODING';
         const blankWritten = written && !a?.text?.trim();
@@ -230,6 +275,9 @@ export class ResultsService {
       ? await this.prisma.attempt.findFirst({ where: { id: attemptId, examId: exam.id } })
       : null;
     if (!attempt) throw new NotFoundException('Attempt not found');
+    if (!(attempt.questionOrder as string[]).includes(questionId)) {
+      throw new NotFoundException('Question not found');
+    }
     if (attempt.status === 'IN_PROGRESS') {
       throw new ConflictException('This student is still taking the exam');
     }
@@ -304,6 +352,93 @@ export class ResultsService {
     return this.results(user, examId);
   }
 
+  /** Total marks shown for the exam; with a question pool this is the typical total per student. */
+  private totalFor(exam: { questions: { marks: number }[]; questionsPerStudent: number | null }) {
+    const total = exam.questions.reduce((s, q) => s + q.marks, 0);
+    const n = exam.questions.length;
+    const shown = exam.questionsPerStudent ? Math.min(exam.questionsPerStudent, n) : n;
+    return round2(n ? (total / n) * shown : 0);
+  }
+
+  /** Lets a student continue a running attempt from a different device. */
+  async releaseDevice(
+    user: AuthUser,
+    examId: string,
+    attemptId: string,
+  ): Promise<{ released: true }> {
+    const exam = await this.findOwned(user, examId);
+    const attempt = UUID.test(attemptId)
+      ? await this.prisma.attempt.findFirst({ where: { id: attemptId, examId: exam.id } })
+      : null;
+    if (!attempt) throw new NotFoundException('Attempt not found');
+    if (attempt.status !== 'IN_PROGRESS') {
+      throw new ConflictException('This attempt has already ended');
+    }
+    await this.prisma.attempt.update({ where: { id: attempt.id }, data: { deviceId: null } });
+    await this.audit.log({
+      actorId: user.id,
+      action: 'attempt.device.release',
+      entity: 'Attempt',
+      entityId: attempt.id,
+    });
+    return { released: true };
+  }
+
+  /** Pairs of coding answers that are very alike, per question and language. */
+  async similarity(
+    user: AuthUser,
+    examId: string,
+    threshold?: number,
+  ): Promise<SimilarityReportDto> {
+    const exam = await this.findOwned(user, examId);
+    const limit =
+      threshold && threshold >= 0.3 && threshold <= 1 ? threshold : INTEGRITY.SIMILARITY_THRESHOLD;
+    const report: SimilarityReportDto = { threshold: limit, questions: [] };
+    for (const [i, q] of exam.questions.entries()) {
+      if (q.type !== 'CODING') continue;
+      const answers = await this.prisma.answer.findMany({
+        where: {
+          questionId: q.id,
+          text: { not: null },
+          attempt: { examId: exam.id, status: { not: 'IN_PROGRESS' } },
+        },
+        include: {
+          attempt: { select: { id: true, student: { select: { name: true, email: true } } } },
+        },
+      });
+      const spec = q.coding as unknown as CodingSpec | null;
+      const people = new Map(answers.map((a) => [a.attempt.id, a.attempt.student]));
+      const pairs: SimilarityReportDto['questions'][number]['pairs'] = [];
+      let compared = 0;
+      for (const lang of new Set(answers.map((a) => a.language ?? 'python'))) {
+        const group = answers
+          .filter((a) => (a.language ?? 'python') === lang && a.text?.trim())
+          .map((a) => ({ attemptId: a.attempt.id, source: a.text ?? '' }));
+        const found = findSimilar(group, {
+          threshold: limit,
+          starter: spec?.starterCode?.[lang as keyof typeof spec.starterCode],
+        });
+        compared += found.compared;
+        for (const h of found.hits) {
+          pairs.push({
+            similarity: Math.round(h.score * 100),
+            a: { attemptId: h.a, ...people.get(h.a)! },
+            b: { attemptId: h.b, ...people.get(h.b)! },
+          });
+        }
+      }
+      pairs.sort((x, y) => y.similarity - x.similarity);
+      report.questions.push({
+        questionId: q.id,
+        number: i + 1,
+        body: q.body.slice(0, 160),
+        compared,
+        pairs: pairs.slice(0, 100),
+      });
+    }
+    return report;
+  }
+
   async csv(user: AuthUser, examId: string): Promise<{ filename: string; body: string }> {
     const data = await this.results(user, examId);
     const header = [
@@ -326,7 +461,7 @@ export class ResultsService {
         r.status,
         r.submittedAt,
         r.score,
-        r.score === null ? null : data.exam.totalMarks,
+        r.maxScore,
         r.percent,
         r.passed === null ? '' : r.passed ? 'Pass' : 'Fail',
         r.strikes,

@@ -10,7 +10,7 @@ import {
   type SaveAnswerInput,
   type StartAttemptInput,
 } from '@assessiq/shared';
-import { AuthUser, CurrentUser, Roles } from '../common/decorators';
+import { AuthUser, Client, ClientInfo, CurrentUser, Roles } from '../common/decorators';
 import { ZodValidationPipe } from '../common/zod.pipe';
 import { ResultsService } from '../results/results.service';
 import { AttemptsService } from './attempts.service';
@@ -32,14 +32,15 @@ export class AttemptsController {
   @HttpCode(200)
   start(
     @CurrentUser() user: AuthUser,
+    @Client() client: ClientInfo,
     @Body(new ZodValidationPipe(startAttemptSchema)) body: StartAttemptInput,
   ) {
-    return this.attempts.start(user, body.enrollmentId);
+    return this.attempts.start(user, body.enrollmentId, client);
   }
 
   @Get(':id')
-  view(@CurrentUser() user: AuthUser, @Param('id') id: string) {
-    return this.attempts.view(user, id);
+  view(@CurrentUser() user: AuthUser, @Client() client: ClientInfo, @Param('id') id: string) {
+    return this.attempts.view(user, id, client);
   }
 
   /** Only available once the trainer has published results. */
@@ -51,37 +52,40 @@ export class AttemptsController {
   @Put(':id/answers/:questionId')
   save(
     @CurrentUser() user: AuthUser,
+    @Client() client: ClientInfo,
     @Param('id') id: string,
     @Param('questionId') questionId: string,
     @Body(new ZodValidationPipe(saveAnswerSchema)) body: SaveAnswerInput,
   ) {
-    return this.attempts.saveAnswer(user, id, questionId, body);
+    return this.attempts.saveAnswer(user, id, questionId, body, client);
   }
 
   @Post(':id/questions/:questionId/run')
   @HttpCode(200)
   run(
     @CurrentUser() user: AuthUser,
+    @Client() client: ClientInfo,
     @Param('id') id: string,
     @Param('questionId') questionId: string,
     @Body(new ZodValidationPipe(runCodeSchema)) body: RunCodeInput,
   ) {
-    return this.attempts.runSamples(user, id, questionId, body);
+    return this.attempts.runSamples(user, id, questionId, body, client);
   }
 
   @Post(':id/submit')
   @HttpCode(200)
-  submit(@CurrentUser() user: AuthUser, @Param('id') id: string) {
-    return this.attempts.submit(user, id);
+  submit(@CurrentUser() user: AuthUser, @Client() client: ClientInfo, @Param('id') id: string) {
+    return this.attempts.submit(user, id, client);
   }
 
   @Post(':id/events')
   @HttpCode(200)
   event(
     @CurrentUser() user: AuthUser,
+    @Client() client: ClientInfo,
     @Param('id') id: string,
     @Body(new ZodValidationPipe(proctorEventSchema)) body: ProctorEventInput,
   ) {
-    return this.attempts.recordEvent(user, id, body);
+    return this.attempts.recordEvent(user, id, body, client);
   }
 }

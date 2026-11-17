@@ -1,15 +1,33 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { PRICING, type EnrollmentDto, type JoinInfoDto } from '@assessiq/shared';
+import { HttpException, HttpStatus, Injectable, NotFoundException } from '@nestjs/common';
+import { INTEGRITY, PRICING, type EnrollmentDto, type JoinInfoDto } from '@assessiq/shared';
+import { AuditService } from '../audit/audit.service';
 import type { AuthUser } from '../common/decorators';
 import { PrismaService } from '../prisma/prisma.service';
 import { computeJoinState, normalizeCode } from './join-state';
 
 @Injectable()
 export class EnrollmentsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+  ) {}
 
   /** What a student sees after typing a code, before paying. */
   async joinInfo(user: AuthUser, rawCode: string): Promise<JoinInfoDto> {
+    // Guessing codes: too many wrong ones in a short time pauses this student's lookups.
+    const misses = await this.prisma.auditLog.count({
+      where: {
+        actorId: user.id,
+        action: 'join.miss',
+        createdAt: { gt: new Date(Date.now() - INTEGRITY.JOIN_MISS_WINDOW_MS) },
+      },
+    });
+    if (misses >= INTEGRITY.JOIN_MISS_LIMIT) {
+      throw new HttpException(
+        'Too many wrong exam codes. Wait a few minutes and try again.',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
     const exam = await this.prisma.exam.findUnique({
       where: { code: normalizeCode(rawCode) },
       include: {
@@ -18,10 +36,17 @@ export class EnrollmentsService {
         _count: { select: { enrollments: true } },
       },
     });
-    if (!exam || exam.status !== 'PUBLISHED') throw new NotFoundException('Exam code not found');
+    if (!exam || exam.status !== 'PUBLISHED') {
+      await this.audit.log({ actorId: user.id, action: 'join.miss' });
+      throw new NotFoundException('Exam code not found');
+    }
     const enrolled = await this.prisma.enrollment.findUnique({
       where: { examId_studentId: { examId: exam.id, studentId: user.id } },
     });
+    const total = exam.questions.reduce((s, q) => s + q.marks, 0);
+    const shown = exam.questionsPerStudent
+      ? Math.min(exam.questionsPerStudent, exam.questions.length)
+      : exam.questions.length;
     return {
       examId: exam.id,
       code: exam.code!,
@@ -32,8 +57,8 @@ export class EnrollmentsService {
       durationMinutes: exam.durationMinutes,
       startsAt: exam.startsAt?.toISOString() ?? null,
       endsAt: exam.endsAt?.toISOString() ?? null,
-      questionCount: exam.questions.length,
-      totalMarks: Math.round(exam.questions.reduce((s, q) => s + q.marks, 0) * 100) / 100,
+      questionCount: shown,
+      totalMarks: Math.round((total / Math.max(1, exam.questions.length)) * shown * 100) / 100,
       feePaise: PRICING.EXAM_JOIN_PAISE,
       state: computeJoinState({
         startsAt: exam.startsAt,

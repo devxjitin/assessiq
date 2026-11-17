@@ -269,24 +269,51 @@ export default function GradePage() {
 
       {data.finalized && <Alert kind="success">Results are published; marks are locked.</Alert>}
 
-      {data.events.length > 0 && (
-        <details className="card" style={{ marginBottom: 16 }}>
-          <summary style={{ cursor: 'pointer', fontWeight: 600 }}>
-            Proctor events ({data.events.length})
-          </summary>
-          <p className="muted">
-            These are reported by the student's browser and are advisory, not proof of anything.
-          </p>
-          <ul className="muted" style={{ paddingLeft: 18 }}>
-            {data.events.map((e, i) => (
-              <li key={i}>
-                {new Date(e.at).toLocaleTimeString()} · {e.type.replace(/_/g, ' ').toLowerCase()}
-                {e.strike ? ' · strike' : ''}
-              </li>
+      <section className="card" style={{ marginBottom: 16 }}>
+        <h2 style={{ marginTop: 0 }}>Integrity report</h2>
+        {data.integrity.flags.length === 0 ? (
+          <p className="muted">Nothing unusual was recorded for this attempt.</p>
+        ) : (
+          <ul style={{ paddingLeft: 18 }}>
+            {data.integrity.flags.map((f) => (
+              <li key={f.code}>{f.message}</li>
             ))}
           </ul>
-        </details>
-      )}
+        )}
+        <dl className="kv">
+          <dt>Started from</dt>
+          <dd>{data.integrity.startIp ?? '–'}</dd>
+          <dt>Last seen at</dt>
+          <dd>{data.integrity.lastIp ?? '–'}</dd>
+          <dt>Browser</dt>
+          <dd>{data.integrity.userAgent ?? '–'}</dd>
+          {data.integrity.sharedWith.length > 0 && (
+            <>
+              <dt>Same device as</dt>
+              <dd>{data.integrity.sharedWith.map((s) => `${s.name} (${s.email})`).join(', ')}</dd>
+            </>
+          )}
+        </dl>
+        {data.pooled && (
+          <p className="muted">
+            This exam uses a question pool: only this student's questions are shown.
+          </p>
+        )}
+        <h3>Timeline</h3>
+        <p className="muted">
+          Reported by the student's browser and the server. Advisory, not proof of anything.
+        </p>
+        <ul className="muted" style={{ paddingLeft: 18 }}>
+          {data.events.length === 0 && <li>No events</li>}
+          {data.events.map((e, i) => (
+            <li key={i}>
+              {new Date(e.at).toLocaleTimeString()} · {e.type.replace(/_/g, ' ').toLowerCase()}
+              {e.strike ? ' · strike' : ''}
+              {e.ip ? ` · ${e.ip}` : ''}
+            </li>
+          ))}
+        </ul>
+      </section>
 
       {data.questions.map((q) => (
         <section className="card" key={q.questionId} style={{ marginBottom: 14 }}>
