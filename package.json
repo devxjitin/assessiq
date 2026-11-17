@@ -2,7 +2,7 @@
   "name": "assessiq",
   "private": true,
   "version": "0.0.0",
-  "description": "AssessIQ by NandiVex Technologies - online assessment and certification platform",
+  "description": "Parakh by NandiVex Technologies - online assessment and certification platform",
   "engines": {
     "node": ">=20"
   },

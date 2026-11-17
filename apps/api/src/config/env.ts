@@ -10,7 +10,7 @@ const schema = z.object({
   DATA_ENCRYPTION_KEY: z.string().min(32).optional(),
   WEB_ORIGIN: z.string().default('http://localhost:3000'),
   MAIL_TRANSPORT: z.enum(['ses', 'log', 'memory']).default('log'),
-  SES_FROM_EMAIL: z.string().default('no-reply@assessiq.nandivex.in'),
+  SES_FROM_EMAIL: z.string().default('no-reply@parakh.nandivex.in'),
   SES_CONFIGURATION_SET: z.string().optional(),
   // Payments. 'fake' simulates the gateway (staging/dev only); 'razorpay' talks to the real API.
   PAYMENT_PROVIDER: z.enum(['fake', 'razorpay']).default('fake'),

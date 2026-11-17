@@ -65,7 +65,7 @@ export default function VerifyPage() {
             <input
               value={serial}
               onChange={(e) => setSerial(e.target.value)}
-              placeholder="AIQ-XXXX-XXXX-XXXX"
+              placeholder="PRK-XXXX-XXXX-XXXX"
               autoComplete="off"
               spellCheck={false}
             />

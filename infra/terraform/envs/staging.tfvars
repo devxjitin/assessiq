@@ -1,7 +1,9 @@
 environment = "staging"
 
 # Set once the GoDaddy domain is decided (e.g. "yourdomain.com"). Empty = skip cert + SES identity.
-domain_name = "assessiq.nandivex.in" # AssessIQ subdomain of the company domain nandivex.in
+# NOT APPLIED YET: live staging still runs on assessiq.nandivex.in. Do the steps in DOMAIN_MOVE.md before
+# running terraform apply with this value (it replaces the certificate, SES identity and CloudFront aliases).
+domain_name = "parakh.nandivex.in" # Parakh subdomain of the company domain nandivex.in
 
 # Staging is smaller and can be stopped at night to save credit.
 ec2_instance_type          = "t4g.small"

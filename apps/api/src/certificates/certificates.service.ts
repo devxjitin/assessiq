@@ -40,7 +40,7 @@ const EMAIL_LOCK_MS = 10 * 60_000;
 export function generateSerial(): string {
   const block = () =>
     Array.from({ length: 4 }, () => ALPHABET[randomInt(ALPHABET.length)]).join('');
-  return `AIQ-${block()}-${block()}-${block()}`;
+  return `PRK-${block()}-${block()}-${block()}`;
 }
 
 /** Reads the template stored on an exam; anything missing or damaged falls back to the defaults. */
@@ -417,8 +417,8 @@ export class CertificatesService implements OnModuleInit, OnModuleDestroy {
           kind === 'PARTICIPATION' ? exam.passPercent / 2 : Math.max(exam.passPercent, 85),
         participants: kind === 'TRAINER' ? 120 : null,
         issuedOn: new Date(),
-        serialNo: 'AIQ-SAMPLE-0000-0000',
-        verifyUrl: this.verifyUrl('AIQ-SAMPLE-0000-0000'),
+        serialNo: 'PRK-SAMPLE-0000-0000',
+        verifyUrl: this.verifyUrl('PRK-SAMPLE-0000-0000'),
         sample: true,
       },
       template,

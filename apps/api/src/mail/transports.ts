@@ -78,7 +78,7 @@ export class SesTransport implements MailTransport {
   }
 
   async send(message: MailMessage): Promise<string | undefined> {
-    const from = `AssessIQ <${this.from}>`;
+    const from = `Parakh <${this.from}>`;
     const res = await this.client.send(
       new SendEmailCommand({
         FromEmailAddress: from,

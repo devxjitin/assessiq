@@ -1,7 +1,7 @@
-# AssessIQ: Product Implementation Plan
+# Parakh: Product Implementation Plan
 
 **Company:** NandiVex Technologies
-**Product:** AssessIQ, a paid online assessment and certification platform
+**Product:** Parakh, a paid online assessment and certification platform
 **Based on:** the existing Exam Hall codebase (rebuilt into a secure platform; see [../PROJECT_OVERVIEW.md](../PROJECT_OVERVIEW.md))
 **Version:** 1.1 (16 Nov 2026): status updated after Sprint 0 and Sprint 1
 **Repository:** https://github.com/devxjitin/assessiq
@@ -48,7 +48,7 @@ Legend: ✅ done · 🟡 partly done · ⬜ not started · ⛔ blocked
 | Certificate approval    | The **NandiVex admin** approves certificates before they are released.                                                                                                                                                  |
 | Coding questions        | **Auto-graded** against hidden test cases in a sandbox (self-hosted Judge0) at launch.                                                                                                                                  |
 | Payments                | Razorpay (Orders, Checkout, Webhooks). All money lands in NandiVex's account; **the examiner's 50% is paid out manually** by NandiVex (no Razorpay Route).                                                              |
-| Domain                  | **`assessiq.nandivex.in`** (a subdomain of the company domain `nandivex.in`, DNS at GoDaddy). Production: the platform is served at **`https://assessiq.nandivex.in`** itself and its API at `https://api.assessiq.nandivex.in`. Staging: `app-staging.` / `api-staging.` under the same domain. |
+| Domain                  | **`parakh.nandivex.in`** (a subdomain of the company domain `nandivex.in`, DNS at GoDaddy). Production: the platform is served at **`https://parakh.nandivex.in`** itself and its API at `https://api.parakh.nandivex.in`. Staging (to be moved): `app-staging.` / `api-staging.` under `parakh.nandivex.in`. **Until the DNS and AWS move is done, staging still runs at `app-staging.assessiq.nandivex.in` / `api-staging.assessiq.nandivex.in`** (the product name already shows as Parakh). |
 
 ### Deviations from the original plan (decided while building)
 
@@ -523,7 +523,7 @@ Each sprint ends with a demo on `staging` and a short retro. "Done" means code r
 | Signature verification                            | ✅                   | `POST /payments/verify`; HMAC compared in constant time; wrong signature or another user's order is refused                             |
 | Webhook handler, idempotent                       | ✅                   | `POST /payments/webhook`; raw-body signature check, duplicate events ignored, recorded after processing so gateway retries are safe     |
 | Exactly-once publish                              | ✅                   | The status flip and publish happen in one transaction; browser and webhook can arrive in any order                                      |
-| Payment records                                   | ✅                   | `Payment` table: integer paise, GST-inclusive, receipt number `AIQ-R-000001`, provider ids, status                                      |
+| Payment records                                   | ✅                   | `Payment` table: integer paise, GST-inclusive, receipt number `PRK-R-000001`, provider ids, status                                      |
 | Receipt email                                     | ✅                   | Sent once, with code, share link and amount. This is a receipt, **not a GST invoice** (needs GST registration details)                  |
 | Exam code                                         | ✅                   | `NVX-` + 6 characters from an unambiguous alphabet; unique                                                                              |
 | Share link, WhatsApp                              | ✅                   | Copy code, copy link, WhatsApp share. QR code is not done                                                                               |
@@ -652,7 +652,7 @@ Sprint: S0  | S1 S2 S3 S4 S5    | S6 S7        | S8 S9 S10              | S11 S1
 
 ## 5. What we reuse from Exam Hall
 
-| Exam Hall piece                                                                                                                                              | Reuse in AssessIQ                                                                                  |
+| Exam Hall piece                                                                                                                                              | Reuse in Parakh                                                                                  |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
 | `parseQuestionsTxt` (bulk import)                                                                                                                            | Ported to `packages/question-parser`, extended for multi-select, with real tests (from `scratch/`) |
 | Anti-cheat listeners (fullscreen, blur, keys, strikes, alert sound)                                                                                          | Ported to a React hook; events also reported to the server                                         |
@@ -680,7 +680,7 @@ Sprint: S0  | S1 S2 S3 S4 S5    | S6 S7        | S8 S9 S10              | S11 S1
 
 ## 7. Open questions
 
-**Status:** the owner chose to **keep all defaults** (Q1 to Q8). Q7 is resolved: the product is AssessIQ and the domain is `assessiq.nandivex.in`. Q2 still needs an accountant check (GST registration) before go-live. To change a default, edit the table below.
+**Status:** the owner chose to **keep all defaults** (Q1 to Q8). Q7 is resolved: the product is **Parakh** (renamed from the working name AssessIQ) and the domain is **`parakh.nandivex.in`**. Q2 still needs an accountant check (GST registration) before go-live. To change a default, edit the table below.
 
 | #      | Question                                                                                                                                                          | Default assumed                                                                                   |
 | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
@@ -690,5 +690,5 @@ Sprint: S0  | S1 S2 S3 S4 S5    | S6 S7        | S8 S9 S10              | S11 S1
 | **Q4** | Refund policy (e.g. exam cancelled by trainer, student couldn't attend)?                                                                                          | Full refund only if the trainer cancels before the exam starts                                    |
 | **Q5** | Are there **limits** per exam (questions, students, duration)?                                                                                                    | 300 questions, 1,000 students, 6 hours max                                                        |
 | **Q6** | Should practice sets ever expire?                                                                                                                                 | Available for 90 days after the exam closes                                                       |
-| **Q7** | Is the product name **AssessIQ** final, and which GoDaddy domain will be used?                                                                                    | `assessiq` subdomain on the NandiVex domain. **Resolved: `assessiq.nandivex.in`**                 |
+| **Q7** | Is the product name **Parakh** final, and which GoDaddy domain will be used?                                                                                    | `parakh` subdomain on the NandiVex domain. **Resolved: `parakh.nandivex.in`** (the product was first called AssessIQ)                 |
 | **Q8** | Team size and target launch date?                                                                                                                                 | 2 developers + part-time designer/QA; launch in ~6 months                                         |

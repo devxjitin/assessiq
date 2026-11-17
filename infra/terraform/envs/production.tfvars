@@ -1,6 +1,6 @@
 environment = "production"
 
-domain_name = "assessiq.nandivex.in" # AssessIQ subdomain of the company domain nandivex.in
+domain_name = "parakh.nandivex.in" # Parakh subdomain of the company domain nandivex.in
 
 ec2_instance_type          = "t4g.medium"
 db_instance_class          = "db.t4g.micro"

@@ -15,7 +15,7 @@ async function bootstrap() {
   configureApp(app);
   const env = app.get<Env>(ENV);
   await app.listen(env.PORT, '0.0.0.0');
-  console.log(`AssessIQ API listening on :${env.PORT}`);
+  console.log(`Parakh API listening on :${env.PORT}`);
 }
 
 void bootstrap();

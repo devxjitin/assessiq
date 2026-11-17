@@ -1,4 +1,4 @@
-// AssessIQ database schema. Sprint 1 covers identity; exams, payments etc. arrive in later sprints.
+// Parakh database schema. Sprint 1 covers identity; exams, payments etc. arrive in later sprints.
 
 generator client {
   provider      = "prisma-client-js"
@@ -238,7 +238,7 @@ model AuditLog {
 
 model Payment {
   id                String         @id @default(uuid()) @db.Uuid
-  // Human-friendly receipt number, e.g. AIQ-R-000012 (assigned from this sequence).
+  // Human-friendly receipt number, e.g. PRK-R-000012 (assigned from this sequence).
   receiptNo         Int            @unique @default(autoincrement())
   userId            String         @db.Uuid
   examId            String?        @db.Uuid

@@ -149,7 +149,7 @@ describe('paying to publish', () => {
 
     expect(res.body.exam).toMatchObject({ id, status: 'PUBLISHED' });
     expect(res.body.exam.code).toMatch(/^NVX-[A-HJKMNP-Z2-9]{6}$/);
-    expect(res.body.receiptNo).toMatch(/^AIQ-R-\d{6}$/);
+    expect(res.body.receiptNo).toMatch(/^PRK-R-\d{6}$/);
 
     const detail = await ctx.http().get(`/exams/${id}`).set(auth(trainer)).expect(200);
     expect(detail.body).toMatchObject({ status: 'PUBLISHED', code: res.body.exam.code });

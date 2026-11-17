@@ -60,7 +60,7 @@ export async function runCheckout(
       order_id: order.orderId,
       amount: order.amountPaise,
       currency: order.currency,
-      name: 'AssessIQ by NandiVex',
+      name: 'Parakh by NandiVex',
       description: order.description,
       prefill,
       handler: (r: RazorpaySuccess) => {

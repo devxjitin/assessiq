@@ -3,7 +3,7 @@ import { AuthProvider } from '../lib/auth';
 import './globals.css';
 
 export const metadata = {
-  title: 'AssessIQ',
+  title: 'Parakh',
   description: 'Online assessments and verified certificates by NandiVex Technologies',
 };
 

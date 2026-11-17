@@ -337,10 +337,10 @@ describe('admin approval and email', () => {
     const mails = certMails();
     expect(mails.map((m) => m.to).sort()).toEqual(['lee@example.com', 'sam@example.com']);
     const att = mails[0].attachments![0];
-    expect(att.filename).toMatch(/^certificate-AIQ-/);
+    expect(att.filename).toMatch(/^certificate-PRK-/);
     expect(att.contentType).toBe('application/pdf');
     expect(att.content.subarray(0, 5).toString()).toBe('%PDF-');
-    expect(mails[0].text).toContain('https://assessiq.nandivex.in/verify/?serial=AIQ-');
+    expect(mails[0].text).toContain('https://parakh.nandivex.in/verify/?serial=PRK-');
 
     expect((await rows('EMAILED')).rows).toHaveLength(2);
     const mine = (await get(sam, '/certificates/mine').expect(200)).body;
@@ -480,9 +480,9 @@ describe('public verification', () => {
   });
 
   it('says not found for unknown, malformed and tampered serials', async () => {
-    expect((await verify('AIQ-AAAA-BBBB-CCCC').expect(200)).body.state).toBe('NOT_FOUND');
+    expect((await verify('PRK-AAAA-BBBB-CCCC').expect(200)).body.state).toBe('NOT_FOUND');
     expect((await verify('nonsense').expect(200)).body.state).toBe('NOT_FOUND');
-    expect((await verify("AIQ-'; DROP TABLE").expect(200)).body.state).toBe('NOT_FOUND');
+    expect((await verify("PRK-'; DROP TABLE").expect(200)).body.state).toBe('NOT_FOUND');
     const c = await ctx.prisma.certificate.findFirstOrThrow({
       where: { student: { email: 'sam@example.com' } },
     });
@@ -599,7 +599,7 @@ describe('mail bounce notices', () => {
 
 describe('raw email', () => {
   it('builds a multipart message with the PDF attached', () => {
-    const raw = buildRawEmail('AssessIQ <no-reply@assessiq.nandivex.in>', {
+    const raw = buildRawEmail('Parakh <no-reply@parakh.nandivex.in>', {
       to: 'sam@example.com',
       subject: 'Your certificate – ready',
       text: 'Hello',

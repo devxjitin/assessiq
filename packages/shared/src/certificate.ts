@@ -71,7 +71,7 @@ export const DEFAULT_CERT_MESSAGE = {
 } as const;
 
 /** Who signs the trainer's certificate: NandiVex, not the trainer. */
-export const TRAINER_CERT_SIGNATORY = { name: 'NandiVex Technologies', title: 'AssessIQ' } as const;
+export const TRAINER_CERT_SIGNATORY = { name: 'NandiVex Technologies', title: 'Parakh' } as const;
 
 // --------------------------------------------------------------------- DTOs
 
@@ -155,4 +155,4 @@ export const rejectCertificatesSchema = z.object({
 export type RejectCertificatesInput = z.infer<typeof rejectCertificatesSchema>;
 
 /** Letters people can read out without mixing up 0/O and 1/I. */
-export const SERIAL_PATTERN = /^AIQ-[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$/;
+export const SERIAL_PATTERN = /^PRK-[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$/;

@@ -62,7 +62,7 @@ export default function LoginPage() {
 
   return (
     <Shell>
-      <Card title="Welcome back" subtitle="Sign in to your AssessIQ account.">
+      <Card title="Welcome back" subtitle="Sign in to your Parakh account.">
         <form onSubmit={onSubmit} noValidate>
           <Field
             label="Email"

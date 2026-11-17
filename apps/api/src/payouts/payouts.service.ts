@@ -218,7 +218,7 @@ export class PayoutsService {
     };
     const inr = (p: number) => (p / 100).toFixed(2);
     const lines = [
-      ['AssessIQ payout statement'],
+      ['Parakh payout statement'],
       ['Trainer', payout.examiner.name],
       ['Email', payout.examiner.email],
       ['Payout id', payout.id],

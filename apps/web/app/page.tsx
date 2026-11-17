@@ -69,7 +69,7 @@ export default function HomePage() {
         <h2 id="samples-title">Two certificates, both verifiable</h2>
         <p className="muted">
           Every certificate carries a serial number and a QR code. Anyone can check it on{' '}
-          <Link href="/verify/">assessiq.nandivex.in/verify</Link>.
+          <Link href="/verify/">parakh.nandivex.in/verify</Link>.
         </p>
         <div className="sample-grid">
           <figure className="sample">

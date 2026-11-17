@@ -85,7 +85,7 @@ export function PublishPanel({
             className="btn btn-secondary btn-link"
             target="_blank"
             rel="noopener noreferrer"
-            href={`https://wa.me/?text=${encodeURIComponent(`Join my exam "${exam.title}" on AssessIQ. Code: ${exam.code}\n${link}`)}`}
+            href={`https://wa.me/?text=${encodeURIComponent(`Join my exam "${exam.title}" on Parakh. Code: ${exam.code}\n${link}`)}`}
           >
             Share on WhatsApp
           </a>
@@ -148,7 +148,7 @@ export function PublishPanel({
           order_id: order.orderId,
           amount: order.amountPaise,
           currency: order.currency,
-          name: 'AssessIQ by NandiVex',
+          name: 'Parakh by NandiVex',
           description: order.description,
           prefill: { name: userName, email: userEmail },
           handler: (r: RazorpaySuccess) => {

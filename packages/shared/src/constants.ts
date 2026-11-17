@@ -24,5 +24,5 @@ export const LIMITS = {
 
 export const BRAND = {
   COMPANY: 'NandiVex Technologies',
-  PRODUCT: 'AssessIQ',
+  PRODUCT: 'Parakh',
 } as const;

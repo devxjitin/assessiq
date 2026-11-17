@@ -126,8 +126,8 @@ export async function renderCertificate(input: {
   const { facts, template } = input;
   const doc = await PDFDocument.create();
   doc.setTitle(`${CERT_KIND_TITLE[facts.kind]} - ${facts.serialNo}`);
-  doc.setAuthor('AssessIQ by NandiVex Technologies');
-  doc.setProducer('AssessIQ');
+  doc.setAuthor('Parakh by NandiVex Technologies');
+  doc.setProducer('Parakh');
   const page = doc.addPage([W, H]);
 
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
@@ -323,7 +323,7 @@ export async function renderCertificate(input: {
     font: regular,
     color: GREY,
   });
-  const issuer = 'Issued through AssessIQ by NandiVex Technologies';
+  const issuer = 'Issued through Parakh by NandiVex Technologies';
   page.drawText(issuer, {
     x: mid - regular.widthOfTextAtSize(issuer, 8) / 2,
     y: 72,

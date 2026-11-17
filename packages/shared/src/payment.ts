@@ -29,5 +29,5 @@ export interface PublishResultDto {
 }
 
 export function formatReceiptNo(n: number): string {
-  return `AIQ-R-${String(n).padStart(6, '0')}`;
+  return `PRK-R-${String(n).padStart(6, '0')}`;
 }

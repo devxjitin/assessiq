@@ -19,7 +19,7 @@ export function Brand({ compact, light }: { compact?: boolean; light?: boolean }
       {!compact && (
         <span className="brand-text">
           <b>
-            Assess<span>IQ</span>
+            Par<span>akh</span>
           </b>
           <small>by NandiVex</small>
         </span>
@@ -188,7 +188,7 @@ export function AppShell({ children, narrow }: { children: React.ReactNode; narr
             <Icon name="panel" />
           </button>
           <nav className="crumbs" aria-label="Breadcrumb">
-            <span>AssessIQ</span>
+            <span>Parakh</span>
             {crumbs.map((c, i) => (
               <span key={i} className={i === crumbs.length - 1 ? 'crumb-current' : undefined}>
                 <Icon name="chevron" size={14} />

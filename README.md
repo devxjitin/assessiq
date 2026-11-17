@@ -1,4 +1,4 @@
-# AssessIQ
+# Parakh
 
 Online assessments and verified certificates by NandiVex Technologies.
 Plan: [ASSESSIQ_IMPLEMENTATION_PLAN.md](ASSESSIQ_IMPLEMENTATION_PLAN.md). Legacy app: the parent folder (Exam Hall).
@@ -47,7 +47,7 @@ Still open from Sprint 0: ESLint and commit hooks, design system and wireframes,
 - **Trainer:** exam **Certificate** tab (layout, colour, wording, signatory, live PDF preview). When results are published, one certificate is made per eligible student (achievement at or above the pass mark, participation below).
 - **Admin:** `/admin/certificates` queue: preview, approve (per exam or selected), reject with a reason, resend. API under `/admin/certificates/*`.
 - **Students:** emailed the PDF after approval; download from the dashboard (`GET /certificates/mine`, `/certificates/:id/pdf`).
-- **Public:** `/verify/?serial=AIQ-XXXX-XXXX-XXXX` (`GET /verify/:serial`), no sign-in, no scores.
+- **Public:** `/verify/?serial=PRK-XXXX-XXXX-XXXX` (`GET /verify/:serial`), no sign-in, no scores.
 - **Background jobs:** `CERT_JOBS_POLL=on|off` (make PDFs, send approved certificates).
 - **Bounces:** `POST /mail/ses-events?key=$SES_EVENTS_KEY` for AWS SNS; Terraform `ses_events_endpoint` creates the subscription.
 

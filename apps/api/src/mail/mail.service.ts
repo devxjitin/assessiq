@@ -27,7 +27,7 @@ const esc = (s: string) =>
 function layout(title: string, bodyHtml: string): string {
   return `<div style="font-family:system-ui,Arial,sans-serif;max-width:480px;margin:0 auto;padding:24px;color:#111">
 <h2 style="margin:0 0 16px">${esc(title)}</h2>${bodyHtml}
-<p style="color:#666;font-size:12px;margin-top:32px">AssessIQ by NandiVex Technologies. If you did not request this, you can ignore this email.</p></div>`;
+<p style="color:#666;font-size:12px;margin-top:32px">Parakh by NandiVex Technologies. If you did not request this, you can ignore this email.</p></div>`;
 }
 
 function codeBlock(code: string): string {
@@ -80,8 +80,8 @@ export class MailService {
     const minutes = this.env.OTP_TTL_MIN;
     return this.deliver({
       to,
-      subject: 'Verify your AssessIQ email',
-      text: `Hi ${name},\n\nYour AssessIQ verification code is ${code}. It expires in ${minutes} minutes.\n`,
+      subject: 'Verify your Parakh email',
+      text: `Hi ${name},\n\nYour Parakh verification code is ${code}. It expires in ${minutes} minutes.\n`,
       html: layout(
         'Verify your email',
         `<p>Hi ${esc(name)}, use this code to verify your email. It expires in ${minutes} minutes.</p>${codeBlock(code)}`,
@@ -93,7 +93,7 @@ export class MailService {
     const minutes = this.env.OTP_TTL_MIN;
     return this.deliver({
       to,
-      subject: 'Reset your AssessIQ password',
+      subject: 'Reset your Parakh password',
       text: `Hi ${name},\n\nYour password reset code is ${code}. It expires in ${minutes} minutes.\n`,
       html: layout(
         'Reset your password',
@@ -105,7 +105,7 @@ export class MailService {
   sendAccountExists(to: string, name: string) {
     return this.deliver({
       to,
-      subject: 'You already have an AssessIQ account',
+      subject: 'You already have an Parakh account',
       text: `Hi ${name},\n\nSomeone tried to register with this email, but you already have an account. Sign in, or use "Forgot password" if needed.\n`,
       html: layout(
         'You already have an account',
@@ -117,7 +117,7 @@ export class MailService {
   sendPasswordChanged(to: string, name: string) {
     return this.deliver({
       to,
-      subject: 'Your AssessIQ password was changed',
+      subject: 'Your Parakh password was changed',
       text: `Hi ${name},\n\nYour password was just changed. If this was not you, reset your password immediately.\n`,
       html: layout(
         'Password changed',
@@ -164,10 +164,10 @@ Exam creation fee: INR ${rupees} (inclusive of applicable taxes)
     return this.deliver({
       to,
       subject: `Payout of INR ${rupees} sent`,
-      text: `Hi ${name},\n\nNandiVex has sent your AssessIQ earnings.\n\nAmount: INR ${rupees}\nSent to: ${r.destination}\nReference (UTR): ${r.utr}\nDate: ${date}\n\nYou can download the statement from the Earnings page.\n`,
+      text: `Hi ${name},\n\nNandiVex has sent your Parakh earnings.\n\nAmount: INR ${rupees}\nSent to: ${r.destination}\nReference (UTR): ${r.utr}\nDate: ${date}\n\nYou can download the statement from the Earnings page.\n`,
       html: layout(
         'Your payout was sent',
-        `<p>Hi ${esc(name)}, NandiVex has sent your AssessIQ earnings.</p><p style="font-size:14px">Amount: <strong>INR ${rupees}</strong><br>Sent to: ${esc(r.destination)}<br>Reference (UTR): <strong>${esc(r.utr)}</strong><br>Date: ${date}</p><p>You can download the statement from the Earnings page.</p>`,
+        `<p>Hi ${esc(name)}, NandiVex has sent your Parakh earnings.</p><p style="font-size:14px">Amount: <strong>INR ${rupees}</strong><br>Sent to: ${esc(r.destination)}<br>Reference (UTR): <strong>${esc(r.utr)}</strong><br>Date: ${date}</p><p>You can download the statement from the Earnings page.</p>`,
       ),
     });
   }
@@ -193,7 +193,7 @@ Exam creation fee: INR ${rupees} (inclusive of applicable taxes)
     return this.deliver({
       to,
       subject: `${r.trainerName} has paid for your seat in "${r.examTitle}"`,
-      text: `Hello,\n\n${r.trainerName} has reserved and paid for your seat in "${r.examTitle}" on AssessIQ. You do not need to pay.\n\nSign in (or create a student account with this email address) and open:\n${r.link}\n`,
+      text: `Hello,\n\n${r.trainerName} has reserved and paid for your seat in "${r.examTitle}" on Parakh. You do not need to pay.\n\nSign in (or create a student account with this email address) and open:\n${r.link}\n`,
       html: layout(
         'Your exam seat is paid for',
         `<p>${esc(r.trainerName)} has reserved and paid for your seat in <strong>${esc(r.examTitle)}</strong>. You do not need to pay.</p><p>Sign in (or create a student account with this email address) and open:<br><a href="${esc(r.link)}">${esc(r.link)}</a></p>`,
@@ -240,10 +240,10 @@ Exam creation fee: INR ${rupees} (inclusive of applicable taxes)
     return this.deliver({
       to,
       subject: `Receipt ${r.receiptNo}: you have joined "${r.examTitle}"`,
-      text: `Hi ${name},\n\nYou have joined "${r.examTitle}". ${window}\nSign in to AssessIQ to start the exam when it opens.\n\nReceipt ${r.receiptNo}, ${date}\nExam fee: INR ${rupees} (inclusive of applicable taxes)\n`,
+      text: `Hi ${name},\n\nYou have joined "${r.examTitle}". ${window}\nSign in to Parakh to start the exam when it opens.\n\nReceipt ${r.receiptNo}, ${date}\nExam fee: INR ${rupees} (inclusive of applicable taxes)\n`,
       html: layout(
         'You have joined the exam',
-        `<p>Hi ${esc(name)}, you have joined <strong>${esc(r.examTitle)}</strong>. ${esc(window)} Sign in to AssessIQ to start the exam when it opens.</p><hr style="border:0;border-top:1px solid #ddd;margin:20px 0"><p style="font-size:14px">Receipt <strong>${esc(r.receiptNo)}</strong> · ${date}<br>Exam fee: INR ${rupees} (inclusive of applicable taxes)</p>`,
+        `<p>Hi ${esc(name)}, you have joined <strong>${esc(r.examTitle)}</strong>. ${esc(window)} Sign in to Parakh to start the exam when it opens.</p><hr style="border:0;border-top:1px solid #ddd;margin:20px 0"><p style="font-size:14px">Receipt <strong>${esc(r.receiptNo)}</strong> · ${date}<br>Exam fee: INR ${rupees} (inclusive of applicable taxes)</p>`,
       ),
     });
   }

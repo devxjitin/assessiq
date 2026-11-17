@@ -48,7 +48,7 @@ resource "aws_route_table_association" "public" {
 # Web/API host: only HTTP(S) from the internet. No SSH; use SSM Session Manager.
 resource "aws_security_group" "app" {
   name        = "${local.name}-app"
-  description = "AssessIQ app host"
+  description = "Parakh app host"
   vpc_id      = aws_vpc.main.id
 
   ingress {
@@ -80,7 +80,7 @@ resource "aws_security_group" "app" {
 # Database: reachable only from the app host.
 resource "aws_security_group" "db" {
   name        = "${local.name}-db"
-  description = "AssessIQ Postgres"
+  description = "Parakh Postgres"
   vpc_id      = aws_vpc.main.id
 
   ingress {
