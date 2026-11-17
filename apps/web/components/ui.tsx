@@ -23,6 +23,7 @@ const PUBLIC_PATHS = [
 export function Shell({ children, wide }: { children: React.ReactNode; wide?: boolean }) {
   const pathname = (usePathname() ?? '/').replace(/(.)\/$/, '$1');
   if (!PUBLIC_PATHS.includes(pathname)) return <AppShell narrow={!wide}>{children}</AppShell>;
+  if (pathname !== '/') return <AuthShell>{children}</AuthShell>;
   return (
     <div className="public">
       <header className="public-bar">
@@ -30,6 +31,54 @@ export function Shell({ children, wide }: { children: React.ReactNode; wide?: bo
         <ThemeToggle />
       </header>
       <main className={wide ? 'page page-wide' : 'page'}>{children}</main>
+    </div>
+  );
+}
+
+const AUTH_POINTS: { icon: IconName; title: string; text: string }[] = [
+  { icon: 'shield', title: 'Proctored, fair exams', text: 'Full-screen mode, tab-switch strikes and a violation timeline.' },
+  { icon: 'edit', title: 'MCQ, written and coding', text: 'Auto-graded choice and code questions, hand-marked written answers.' },
+  { icon: 'check', title: 'Verified certificates', text: 'Publish results and issue certificates after review.' },
+];
+
+/** Split layout for sign-in, sign-up and password pages: brand panel on the left, form on the right. */
+function AuthShell({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="auth">
+      <aside className="auth-side">
+        <Brand light />
+        <div className="auth-pitch">
+          <h2>Run exams you can trust.</h2>
+          <p>Create, proctor and grade online exams and certifications, from a ten-question quiz to a coding test.</p>
+          <ul>
+            {AUTH_POINTS.map((p) => (
+              <li key={p.title}>
+                <span className="auth-ico">
+                  <Icon name={p.icon} size={18} />
+                </span>
+                <div>
+                  <b>{p.title}</b>
+                  <span>{p.text}</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <a className="auth-by" href="https://nandivex.in" target="_blank" rel="noreferrer">
+          A product of NandiVex Technologies &middot; nandivex.in
+        </a>
+      </aside>
+      <div className="auth-main">
+        <header className="auth-top">
+          <span className="auth-top-brand">
+            <Brand />
+          </span>
+          <span className="spacer" />
+          <ThemeToggle />
+        </header>
+        <main className="auth-form">{children}</main>
+        <footer className="auth-foot">&copy; NandiVex Technologies</footer>
+      </div>
     </div>
   );
 }

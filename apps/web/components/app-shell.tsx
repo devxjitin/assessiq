@@ -9,10 +9,13 @@ import { Icon, type IconName } from './icons';
 type Theme = 'light' | 'dark';
 
 /** Brand mark + wordmark. */
-export function Brand({ compact }: { compact?: boolean }) {
+export function Brand({ compact, light }: { compact?: boolean; light?: boolean }) {
   return (
-    <Link href="/" className="brand">
-      <span className="brand-mark">A</span>
+    <Link href="/" className={`brand${light ? ' brand-light' : ''}`}>
+      <span className="brand-mark">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/nandivex-logo.png" alt="NandiVex" width={34} height={34} />
+      </span>
       {!compact && (
         <span className="brand-text">
           <b>
