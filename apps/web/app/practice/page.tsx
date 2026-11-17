@@ -25,6 +25,8 @@ import { useRequireAuth } from '../../lib/auth';
 
 const letter = (i: number) => String.fromCharCode(65 + i);
 const when = (iso: string) => new Date(iso).toLocaleString();
+const day = (iso: string) =>
+  new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
 
 export default function PracticePage() {
   const { user, loading } = useRequireAuth();
@@ -80,7 +82,7 @@ function PracticeList() {
               <div>
                 <strong>{p.title}</strong>
                 <div className="muted">
-                  {p.trainerName} · {p.questionCount} questions
+                  {p.trainerName} · {p.questionCount} questions · open until {day(p.expiresAt)}
                 </div>
               </div>
               <span className="spacer" />
@@ -190,7 +192,10 @@ function PracticeSet({ examId }: { examId: string }) {
 
   return (
     <>
-      <PageHeader title={set.title} subtitle="Practice · does not affect your official result">
+      <PageHeader
+        title={set.title}
+        subtitle={`Practice · open until ${day(set.expiresAt)} · does not affect your official result`}
+      >
         <Link className="btn btn-secondary btn-link" href="/practice/">
           All practice sets
         </Link>

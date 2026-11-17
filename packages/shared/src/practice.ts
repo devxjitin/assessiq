@@ -8,6 +8,8 @@ export const PRACTICE = {
   CHECK_COOLDOWN_MS: 3000,
   /** Attempts kept per student and exam; older ones are dropped from the history list. */
   HISTORY_LIMIT: 50,
+  /** A practice set stays open this many days after the exam closes. */
+  EXPIRY_DAYS: 90,
 } as const;
 
 /** One question, asking for instant feedback. Send the answer that matches the question type. */
@@ -36,6 +38,8 @@ export interface PracticeSummaryDto {
   rounds: number;
   bestPercent: number | null;
   lastRoundAt: string | null;
+  /** The last day the set can be opened. */
+  expiresAt: string;
 }
 
 export interface PracticeQuestionDto {
@@ -51,6 +55,7 @@ export interface PracticeQuestionDto {
 export interface PracticeSetDto {
   examId: string;
   title: string;
+  expiresAt: string;
   questions: PracticeQuestionDto[];
 }
 

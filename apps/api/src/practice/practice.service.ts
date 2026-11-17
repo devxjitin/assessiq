@@ -34,6 +34,8 @@ import { GradingService } from '../results/grading.service';
 const UUID = /^[0-9a-f-]{36}$/i;
 const OVER = ['CLOSED', 'GRADING', 'RESULTS_FINAL', 'CERT_PENDING_APPROVAL', 'CERT_RELEASED'];
 
+const DAY_MS = 86_400_000;
+
 type Type = 'SINGLE' | 'MULTI' | 'SUBJECTIVE' | 'CODING';
 
 /**
@@ -60,6 +62,15 @@ export class PracticeService {
     );
   }
 
+  /** When the exam closed: its end time, or else when results came out. */
+  private closedAt(exam: Pick<Exam, 'endsAt' | 'resultsPublishedAt' | 'updatedAt'>): Date {
+    return exam.endsAt ?? exam.resultsPublishedAt ?? exam.updatedAt;
+  }
+
+  private expiresAt(exam: Pick<Exam, 'endsAt' | 'resultsPublishedAt' | 'updatedAt'>): Date {
+    return new Date(this.closedAt(exam).getTime() + PRACTICE.EXPIRY_DAYS * DAY_MS);
+  }
+
   /** 403 unless the exam is over and this student handed in an attempt. */
   private async unlock(user: AuthUser, examId: string) {
     if (!UUID.test(examId)) throw new NotFoundException('Practice set not found');
@@ -70,6 +81,11 @@ export class PracticeService {
     if (!exam) throw new NotFoundException('Practice set not found');
     if (!this.isOver(exam)) {
       throw new ForbiddenException('Practice opens after the exam has closed');
+    }
+    if (this.expiresAt(exam).getTime() <= Date.now()) {
+      throw new ForbiddenException(
+        `This practice set expired ${PRACTICE.EXPIRY_DAYS} days after the exam closed`,
+      );
     }
     // Students who closed the tab are still "in progress" until someone settles them.
     await this.grading.settleOverdue(examId);
@@ -102,7 +118,9 @@ export class PracticeService {
         },
       },
     });
-    const open = attempts.filter((a) => this.isOver(a.exam));
+    const open = attempts.filter(
+      (a) => this.isOver(a.exam) && this.expiresAt(a.exam).getTime() > Date.now(),
+    );
     if (open.length === 0) return [];
     const rounds = await this.prisma.practiceRound.groupBy({
       by: ['examId'],
@@ -124,6 +142,7 @@ export class PracticeService {
           rounds: r?._count._all ?? 0,
           bestPercent: r?._max.percent ?? null,
           lastRoundAt: r?._max.createdAt?.toISOString() ?? null,
+          expiresAt: this.expiresAt(a.exam).toISOString(),
         };
       })
       .sort((a, b) => a.title.localeCompare(b.title));
@@ -136,6 +155,7 @@ export class PracticeService {
     return {
       examId,
       title: exam.title,
+      expiresAt: this.expiresAt(exam).toISOString(),
       questions: exam.questions.map((q, i) => this.toDto(q, i + 1)),
     };
   }

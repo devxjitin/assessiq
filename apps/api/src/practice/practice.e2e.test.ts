@@ -114,6 +114,50 @@ describe('who can open a practice set', () => {
   });
 });
 
+describe('expiry', () => {
+  const closedDaysAgo = (days: number) =>
+    ctx.prisma.exam.update({
+      where: { id: exam.examId },
+      data: { endsAt: new Date(Date.now() - days * 86_400_000) },
+    });
+
+  beforeEach(async () => {
+    await submitExam();
+  });
+
+  it('stays open for 90 days after the exam closes, and says until when', async () => {
+    await closedDaysAgo(89);
+    const res = await set().expect(200);
+    const left = new Date(res.body.expiresAt).getTime() - Date.now();
+    expect(left).toBeGreaterThan(0);
+    expect(left).toBeLessThan(86_400_000);
+    const list = (await ctx.http().get('/practice').set(auth(sam)).expect(200)).body;
+    expect(list).toHaveLength(1);
+    expect(list[0].expiresAt).toBe(res.body.expiresAt);
+  });
+
+  it('closes after 90 days: not listed, not openable, no checks or rounds', async () => {
+    await closedDaysAgo(91);
+    const res = await set().expect(403);
+    expect(res.body.message).toMatch(/expired/i);
+    await check(exam.questionIds.single, { selected: [0] }).expect(403);
+    await round({}).expect(403);
+    await ctx.http().get('/practice').set(auth(sam)).expect(200).expect([]);
+  });
+
+  it('counts from when results came out if the exam has no end time', async () => {
+    await ctx.prisma.exam.update({
+      where: { id: exam.examId },
+      data: {
+        endsAt: null,
+        status: 'RESULTS_FINAL',
+        resultsPublishedAt: new Date(Date.now() - 91 * 86_400_000),
+      },
+    });
+    await set().expect(403);
+  });
+});
+
 describe('what the set shows', () => {
   beforeEach(async () => {
     await submitExam();

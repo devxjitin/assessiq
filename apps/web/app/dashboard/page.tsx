@@ -199,7 +199,11 @@ function PracticeSets() {
             <div>
               <strong>{p.title}</strong>
               <div className="muted">
-                {p.questionCount} questions
+                {p.questionCount} questions · until{' '}
+                {new Date(p.expiresAt).toLocaleDateString('en-GB', {
+                  day: 'numeric',
+                  month: 'short',
+                })}
                 {p.rounds > 0
                   ? ` · ${p.rounds} round${p.rounds === 1 ? '' : 's'}, best ${p.bestPercent}%`
                   : ''}
