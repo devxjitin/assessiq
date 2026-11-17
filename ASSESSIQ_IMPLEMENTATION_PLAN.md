@@ -19,7 +19,7 @@ Legend: ✅ done · 🟡 partly done · ⬜ not started · ⛔ blocked
 | P1 Core MVP   | **S1** Identity                                    | ✅ Done, live on staging      | Accounts, email-code verification, login/refresh, password reset, roles, admin, audit log. 28 API tests.                                                                  |
 | P1 Core MVP   | **S2** Exam builder                                | ✅ Done, live on staging      | Draft exams, single/multi/subjective questions, bulk import, private logo, student preview. 19 new API tests.                                                             |
 | P1 Core MVP   | **S3** Creation payments                           | ✅ Done with a fake provider  | Publish flow, signed verify + idempotent webhook, receipts, exam codes. Real Razorpay needs your TEST keys (code is written, not yet run against Razorpay). 18 new tests. |
-| P1 Core MVP   | **S4** Join & take exam                            | ✅ Done locally, not deployed | Join by code + fee, server-timed attempt, shuffle, autosave, strikes. 24 new tests.                                                                                       |
+| P1 Core MVP   | **S4** Join & take exam                            | ✅ Done, on staging | Join by code + fee, server-timed attempt, shuffle, autosave, strikes. 24 new tests.                                                                                       |
 | P1 Core MVP   | S5 Grading & results                               | ⬜                            |                                                                                                                                                                           |
 | P2            | S6 Coding engine · S7 Integrity                    | ⬜                            |                                                                                                                                                                           |
 | P3            | S8 Ledger/payouts · S9 Certificates · S10 Practice | ⬜                            |                                                                                                                                                                           |
@@ -339,7 +339,7 @@ Each sprint ends with a demo on `staging` and a short retro. "Done" means code r
 | **S4: Join & take exam** ✅  | Student exam engine | Join by code → ₹149 payment → enrollment; exam lobby; **server-timed attempt**, per-student shuffle, autosave, navigator/flagging, submit/auto-submit; ported anti-cheat with server-side event logging and strike decision           | Answers survive a page refresh/network drop; late submissions rejected; the API never returns correct answers |
 | **S5: Grading & results** ⬜ | Results             | Auto-grade single/multi MCQ (all-or-nothing/partial), subjective grading screen with rubric and feedback, finalise results, student result page and scorecard, examiner dashboard (attempts, scores, violations), CSV export          | Grading math covered by unit tests; results hidden until finalised                                            |
 
-#### Sprint 4 completion report ✅ (built and tested locally; **not yet deployed to staging**)
+#### Sprint 4 completion report ✅ (deployed to staging 2026-11-17)
 
 | Scope item                     | Status      | Where / how                                                                                                                                                                                                                                    |
 | ------------------------------ | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -359,14 +359,14 @@ Each sprint ends with a demo on `staging` and a short retro. "Done" means code r
 
 **Known gaps after Sprint 4:**
 
-- **Not deployed:** staging still runs Sprint 2. The AWS login expired; run `aws login`, then deploy Sprints 3 and 4 together.
+- **Deployed:** Sprints 3 and 4 and the new UI went to staging on 2026-11-17 (fake payment provider, so publishing and joining are free there).
 - Proctoring is advisory: a determined student can stop the browser reporting events (second device, modified client). The server cannot see the screen.
 - No sweeper yet: an attempt nobody opens again stays `IN_PROGRESS` until the grading sprint adds a job that auto-submits overdue attempts.
 - Grading and results are Sprint 5; a submitted student only sees "Exam submitted".
 - No "waiting room" countdown before the exam opens; students can join early but only start once it opens.
 - Students on a shared network are exempt from the per-IP rate limit on exam routes by design; login routes keep theirs.
 
-#### Sprint 3 completion report ✅ (fake payment provider; **not yet deployed to staging**)
+#### Sprint 3 completion report ✅ (fake payment provider; deployed to staging 2026-11-17)
 
 | Scope item                                        | Status               | Where / how                                                                                                                             |
 | ------------------------------------------------- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
@@ -388,7 +388,7 @@ Each sprint ends with a demo on `staging` and a short retro. "Done" means code r
 
 **Known gaps after Sprint 3:**
 
-- **Not deployed:** the AWS login expired during the staging deploy, so staging still runs Sprint 2. Re-run `aws login`, then deploy.
+- **Deployed** to staging together with Sprint 4.
 - Real Razorpay has never been run: it needs your TEST key id/secret and a webhook, then one end-to-end test payment.
 - Once deployed, staging will use the fake provider, so anyone with a trainer account can publish for free there.
 - No GST invoice, no refund flow, no QR code, no payment history page for trainers.
