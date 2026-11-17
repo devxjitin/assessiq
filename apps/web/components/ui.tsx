@@ -1,19 +1,99 @@
 'use client';
 
-import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import type { ZodTypeAny, z } from 'zod';
 import { ApiError } from '../lib/api';
+import { AppShell, Brand, ThemeToggle } from './app-shell';
+import { Icon, type IconName } from './icons';
 
+const PUBLIC_PATHS = [
+  '/',
+  '/login',
+  '/register',
+  '/forgot-password',
+  '/reset-password',
+  '/verify-email',
+];
+
+/**
+ * Page frame. Signed-out pages (landing, sign-in, ...) get a centred layout; every other page
+ * gets the app shell with the sidebar and top bar.
+ */
 export function Shell({ children, wide }: { children: React.ReactNode; wide?: boolean }) {
+  const pathname = (usePathname() ?? '/').replace(/(.)\/$/, '$1');
+  if (!PUBLIC_PATHS.includes(pathname)) return <AppShell narrow={!wide}>{children}</AppShell>;
   return (
-    <main className={wide ? 'page page-wide' : 'page'}>
-      <Link href="/" className="brand">
-        Assess<span>IQ</span>
-      </Link>
-      {children}
-    </main>
+    <div className="public">
+      <header className="public-bar">
+        <Brand />
+        <ThemeToggle />
+      </header>
+      <main className={wide ? 'page page-wide' : 'page'}>{children}</main>
+    </div>
   );
+}
+
+export function PageHeader({
+  title,
+  subtitle,
+  children,
+}: {
+  title: string;
+  subtitle?: React.ReactNode;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className="page-head">
+      <div>
+        <h1>{title}</h1>
+        {subtitle && <p className="muted">{subtitle}</p>}
+      </div>
+      {children && <div className="toolbar">{children}</div>}
+    </div>
+  );
+}
+
+export function StatCard({
+  label,
+  value,
+  note,
+  icon,
+  highlight,
+}: {
+  label: string;
+  value: React.ReactNode;
+  note?: string;
+  icon: IconName;
+  highlight?: boolean;
+}) {
+  return (
+    <div className={`stat${highlight ? ' stat-hl' : ''}`}>
+      <div className="stat-top">
+        <span>{label}</span>
+        <Icon name={icon} size={16} />
+      </div>
+      <div className="stat-value">{value}</div>
+      {note && <div className="stat-note">{note}</div>}
+    </div>
+  );
+}
+
+const BADGE_KIND: Record<string, string> = {
+  PAYMENT_PENDING: 'warn',
+  PUBLISHED: 'info',
+  LIVE: 'success',
+  GRADING: 'warn',
+  RESULTS_FINAL: 'success',
+  CERT_PENDING_APPROVAL: 'warn',
+  ACTIVE: 'success',
+  SUSPENDED: 'danger',
+};
+
+export function StatusBadge({ status, label }: { status: string; label?: string }) {
+  const kind = BADGE_KIND[status];
+  const text = label ?? status.replace(/_/g, ' ').toLowerCase();
+  return <span className={`badge${kind ? ' badge-' + kind : ''}`}>{text}</span>;
 }
 
 export function Card({

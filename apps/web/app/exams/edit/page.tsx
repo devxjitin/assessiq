@@ -6,7 +6,14 @@ import type { ExamDetailDto, ExamQuestionDto } from '@assessiq/shared';
 import { ExamSettingsForm } from '../../../components/exam-settings-form';
 import { PublishPanel } from '../../../components/publish-panel';
 import { QuestionEditor } from '../../../components/question-editor';
-import { Alert, Button, Shell, describeError, useQueryParam } from '../../../components/ui';
+import {
+  Alert,
+  Button,
+  Shell,
+  StatusBadge,
+  describeError,
+  useQueryParam,
+} from '../../../components/ui';
 import { ApiError, api, apiBlob } from '../../../lib/api';
 import { useRequireAuth } from '../../../lib/auth';
 
@@ -431,8 +438,8 @@ export default function EditExamPage() {
         <div>
           <h1 style={{ margin: 0 }}>{exam.title}</h1>
           <p className="muted" style={{ margin: 0 }}>
-            <span className="badge">{exam.status}</span> {exam.questionCount} questions ·{' '}
-            {exam.totalMarks} marks · {exam.durationMinutes} min
+            <StatusBadge status={exam.status} /> {exam.questionCount} questions · {exam.totalMarks}{' '}
+            marks · {exam.durationMinutes} min
           </p>
         </div>
         <div className="toolbar">

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import type { ExamSummaryDto } from '@assessiq/shared';
-import { Alert, Shell } from '../../components/ui';
+import { Alert, PageHeader, Shell, StatusBadge } from '../../components/ui';
 import { api } from '../../lib/api';
 import { useRequireAuth } from '../../lib/auth';
 
@@ -36,22 +36,22 @@ export default function ExamsPage() {
 
   return (
     <Shell wide>
-      <div className="topbar">
-        <h1 style={{ margin: 0 }}>Your exams</h1>
-        <div className="toolbar">
-          <Link className="btn btn-secondary btn-link" href="/dashboard/">
-            Dashboard
-          </Link>
-          <Link className="btn btn-primary btn-link" href="/exams/new/">
-            New exam
-          </Link>
-        </div>
-      </div>
+      <PageHeader
+        title="My exams"
+        subtitle="Build exams, add questions and share them with students."
+      >
+        <Link className="btn btn-primary btn-link" href="/exams/new/">
+          New exam
+        </Link>
+      </PageHeader>
       {error && <Alert>{error}</Alert>}
-      <section className="card" style={{ marginTop: 16 }}>
+      <section className="card">
         {exams === null && !error && <p className="muted">Loading…</p>}
         {exams?.length === 0 && (
-          <p className="muted">You have no exams yet. Create one to start adding questions.</p>
+          <div className="empty">
+            <strong>No exams yet</strong>
+            Create one to start adding questions.
+          </div>
         )}
         {exams && exams.length > 0 && (
           <div className="table-wrap">
@@ -71,13 +71,18 @@ export default function ExamsPage() {
                   <tr key={e.id}>
                     <td>{e.title}</td>
                     <td>
-                      <span className="badge">{e.status}</span>
+                      <StatusBadge status={e.status} />
                     </td>
                     <td>{e.questionCount}</td>
                     <td>{e.totalMarks}</td>
                     <td>{e.durationMinutes} min</td>
                     <td>
-                      <Link href={`/exams/edit/?id=${e.id}`}>Open</Link>
+                      <Link
+                        className="btn btn-secondary btn-small btn-link"
+                        href={`/exams/edit/?id=${e.id}`}
+                      >
+                        Open
+                      </Link>
                     </td>
                   </tr>
                 ))}

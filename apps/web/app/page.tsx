@@ -3,12 +3,13 @@
 import Link from 'next/link';
 import { BRAND, PRICING, formatInr } from '@assessiq/shared';
 import { useAuth } from '../lib/auth';
+import { Icon } from '../components/icons';
 import { Shell } from '../components/ui';
 
 export default function HomePage() {
   const { user, loading } = useAuth();
   return (
-    <Shell>
+    <Shell wide>
       <section className="hero">
         <h1>
           Exams and certificates, <br />
@@ -34,6 +35,31 @@ export default function HomePage() {
               </Link>
             </>
           )}
+        </div>
+      </section>
+      <section className="features">
+        <div className="card">
+          <span className="feature-icon">
+            <Icon name="exams" />
+          </span>
+          <h3>For trainers</h3>
+          <p>
+            Build exams with single, multiple-choice and written questions, or import them in bulk.
+          </p>
+        </div>
+        <div className="card">
+          <span className="feature-icon">
+            <Icon name="join" />
+          </span>
+          <h3>For students</h3>
+          <p>Join with a code, take a timed exam that saves as you go, and see your result.</p>
+        </div>
+        <div className="card">
+          <span className="feature-icon">
+            <Icon name="shield" />
+          </span>
+          <h3>Verified certificates</h3>
+          <p>Passing students receive a certificate approved by NandiVex and delivered by email.</p>
         </div>
       </section>
     </Shell>
