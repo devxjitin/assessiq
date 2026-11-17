@@ -102,6 +102,8 @@ model User {
   payouts         Payout[]         @relation("PayoutExaminer")
   seatPacks       SeatPack[]       @relation("SeatSponsor")
   certificates    Certificate[]
+  practiceAccess  PracticeAccess[]
+  practiceRounds  PracticeRound[]
 
   @@index([role])
 }
@@ -134,13 +136,15 @@ model Exam {
   createdAt           DateTime   @default(now())
   updatedAt           DateTime   @updatedAt
 
-  examiner     User          @relation(fields: [examinerId], references: [id], onDelete: Restrict)
-  questions    Question[]
-  payments     Payment[]
-  enrollments  Enrollment[]
-  attempts     Attempt[]
-  seatPacks    SeatPack[]
-  certificates Certificate[]
+  examiner       User             @relation(fields: [examinerId], references: [id], onDelete: Restrict)
+  questions      Question[]
+  payments       Payment[]
+  enrollments    Enrollment[]
+  attempts       Attempt[]
+  seatPacks      SeatPack[]
+  certificates   Certificate[]
+  practiceAccess PracticeAccess[]
+  practiceRounds PracticeRound[]
 
   @@index([examinerId, createdAt])
   @@index([status])
@@ -558,4 +562,37 @@ model EmailEvent {
   createdAt DateTime @default(now())
 
   @@index([messageId])
+}
+
+// A student who took an exam may practise its questions once the exam is over. Created the first
+// time they open the set. Practice has its own tables and never changes an official score.
+model PracticeAccess {
+  id         String   @id @default(uuid()) @db.Uuid
+  studentId  String   @db.Uuid
+  examId     String   @db.Uuid
+  unlockedAt DateTime @default(now())
+
+  student User @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  exam    Exam @relation(fields: [examId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, examId])
+}
+
+// One finished practice round (choice questions are scored).
+model PracticeRound {
+  id          String   @id @default(uuid()) @db.Uuid
+  studentId   String   @db.Uuid
+  examId      String   @db.Uuid
+  score       Float
+  maxScore    Float
+  percent     Float
+  answered    Int
+  scoredCount Int
+  results     Json
+  createdAt   DateTime @default(now())
+
+  student User @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  exam    Exam @relation(fields: [examId], references: [id], onDelete: Cascade)
+
+  @@index([studentId, examId, createdAt])
 }

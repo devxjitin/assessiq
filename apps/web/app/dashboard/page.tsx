@@ -7,6 +7,7 @@ import {
   type EnrollmentDto,
   type ExamSummaryDto,
   type MyCertificateDto,
+  type PracticeSummaryDto,
 } from '@assessiq/shared';
 import { Alert, Button, PageHeader, Shell, StatCard, StatusBadge } from '../../components/ui';
 import { api, apiBlob } from '../../lib/api';
@@ -178,6 +179,43 @@ function Certificates() {
   );
 }
 
+function PracticeSets() {
+  const [items, setItems] = useState<PracticeSummaryDto[]>([]);
+  useEffect(() => {
+    api<PracticeSummaryDto[]>('/practice')
+      .then(setItems)
+      .catch(() => undefined);
+  }, []);
+  if (items.length === 0) return null;
+  return (
+    <section className="card" style={{ marginBottom: 16 }}>
+      <h2 style={{ marginTop: 0 }}>Practice sets</h2>
+      <p className="card-sub">
+        Unlocked because you took these exams. Practice never changes your result.
+      </p>
+      <div className="stack">
+        {items.map((p) => (
+          <div className="toolbar" key={p.examId}>
+            <div>
+              <strong>{p.title}</strong>
+              <div className="muted">
+                {p.questionCount} questions
+                {p.rounds > 0
+                  ? ` · ${p.rounds} round${p.rounds === 1 ? '' : 's'}, best ${p.bestPercent}%`
+                  : ''}
+              </div>
+            </div>
+            <span className="spacer" />
+            <Link className="btn btn-secondary btn-link" href={`/practice/?exam=${p.examId}`}>
+              {p.rounds > 0 ? 'Practise again' : 'Start'}
+            </Link>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function StudentHome() {
   const [items, setItems] = useState<EnrollmentDto[] | null>(null);
   const [error, setError] = useState('');
@@ -223,14 +261,20 @@ function StudentHome() {
         />
       </div>
       <Certificates />
+      <PracticeSets />
       <div className="two-col">
         <StudentExams items={items} loadError={error} />
         <section className="card">
           <h2 style={{ marginTop: 0 }}>Quick actions</h2>
           <p className="card-sub">Have an exam code?</p>
-          <Link className="btn btn-primary btn-link" href="/join/">
-            Join an exam
-          </Link>
+          <div className="toolbar">
+            <Link className="btn btn-primary btn-link" href="/join/">
+              Join an exam
+            </Link>
+            <Link className="btn btn-secondary btn-link" href="/practice/">
+              Practice sets
+            </Link>
+          </div>
         </section>
       </div>
     </>

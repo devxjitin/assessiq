@@ -10,3 +10,4 @@ export * from './coding';
 export * from './integrity';
 export * from './ledger';
 export * from './certificate';
+export * from './practice';

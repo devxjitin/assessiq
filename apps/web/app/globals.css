@@ -1143,3 +1143,14 @@ tbody tr:last-child td {
   color: var(--muted);
   font-size: 0.92rem;
 }
+
+/* ---------- practice feedback on an option ---------- */
+.q-pick.correct {
+  border-color: var(--success);
+  color: var(--success);
+  font-weight: 600;
+}
+.q-pick.wrong {
+  border-color: var(--danger);
+  color: var(--danger);
+}
