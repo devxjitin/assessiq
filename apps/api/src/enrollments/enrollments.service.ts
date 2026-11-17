@@ -53,7 +53,17 @@ export class EnrollmentsService {
         exam: {
           select: { id: true, title: true, startsAt: true, endsAt: true, durationMinutes: true },
         },
-        attempt: { select: { id: true, status: true, deadlineAt: true } },
+        attempt: {
+          select: {
+            id: true,
+            status: true,
+            deadlineAt: true,
+            score: true,
+            maxScore: true,
+            percent: true,
+            passed: true,
+          },
+        },
       },
     });
     const now = new Date();
@@ -78,6 +88,15 @@ export class EnrollmentsService {
               deadlineAt: r.attempt.deadlineAt.toISOString(),
             }
           : null,
+        result:
+          r.attempt?.status === 'RESULT_PUBLISHED' && r.attempt.score !== null
+            ? {
+                score: r.attempt.score,
+                maxScore: r.attempt.maxScore ?? 0,
+                percent: r.attempt.percent ?? 0,
+                passed: Boolean(r.attempt.passed),
+              }
+            : null,
         canStart: !attemptDone && (Boolean(running) || open),
       };
     });

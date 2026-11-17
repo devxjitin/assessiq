@@ -10,6 +10,7 @@ import {
 } from '@assessiq/shared';
 import { AuthUser, CurrentUser, Roles } from '../common/decorators';
 import { ZodValidationPipe } from '../common/zod.pipe';
+import { ResultsService } from '../results/results.service';
 import { AttemptsService } from './attempts.service';
 
 /**
@@ -20,7 +21,10 @@ import { AttemptsService } from './attempts.service';
 @SkipThrottle()
 @Controller('attempts')
 export class AttemptsController {
-  constructor(private readonly attempts: AttemptsService) {}
+  constructor(
+    private readonly attempts: AttemptsService,
+    private readonly results: ResultsService,
+  ) {}
 
   @Post()
   @HttpCode(200)
@@ -34,6 +38,12 @@ export class AttemptsController {
   @Get(':id')
   view(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.attempts.view(user, id);
+  }
+
+  /** Only available once the trainer has published results. */
+  @Get(':id/result')
+  result(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.results.studentResult(user, id);
   }
 
   @Put(':id/answers/:questionId')

@@ -168,7 +168,7 @@ describe('finishing', () => {
     const a = await begin();
     const done = await ctx.http().post(`/attempts/${a.id}/submit`).set(auth(sam)).expect(200);
     expect(done.body).toMatchObject({
-      status: 'SUBMITTED',
+      status: 'GRADED',
       endReason: 'SUBMITTED_BY_STUDENT',
       questions: [],
     });
@@ -183,7 +183,7 @@ describe('finishing', () => {
     // And the student cannot start a fresh attempt.
     const again = (await start().expect(200)).body;
     expect(again.id).toBe(a.id);
-    expect(again.status).toBe('SUBMITTED');
+    expect(again.status).toBe('GRADED');
     const list = (await ctx.http().get('/me/enrollments').set(auth(sam)).expect(200)).body;
     expect(list[0].canStart).toBe(false);
   });
@@ -212,7 +212,7 @@ describe('finishing', () => {
       .send({ selected: [2] })
       .expect(409);
     const row = await ctx.prisma.attempt.findUnique({ where: { id: a.id } });
-    expect(row).toMatchObject({ status: 'AUTO_SUBMITTED', endReason: 'TIME_UP' });
+    expect(row).toMatchObject({ status: 'GRADED', endReason: 'TIME_UP' });
     const saved = await ctx.prisma.answer.findFirst({ where: { attemptId: a.id } });
     expect(saved?.selected).toEqual([1]); // the late write did not land
   });
@@ -224,7 +224,7 @@ describe('finishing', () => {
       data: { deadlineAt: new Date(Date.now() - 60_000) },
     });
     const view = (await ctx.http().get(`/attempts/${a.id}`).set(auth(sam)).expect(200)).body;
-    expect(view).toMatchObject({ status: 'AUTO_SUBMITTED', endReason: 'TIME_UP', questions: [] });
+    expect(view).toMatchObject({ status: 'GRADED', endReason: 'TIME_UP', questions: [] });
   });
 });
 
@@ -257,7 +257,7 @@ describe('proctoring', () => {
     const last = (await event(a.id, 'FULLSCREEN_EXIT').expect(200)).body;
     expect(last).toMatchObject({ strikes: 3, ended: true, status: 'AUTO_SUBMITTED' });
     const row = await ctx.prisma.attempt.findUnique({ where: { id: a.id } });
-    expect(row).toMatchObject({ status: 'AUTO_SUBMITTED', endReason: 'STRIKES' });
+    expect(row).toMatchObject({ status: 'GRADED', endReason: 'STRIKES' });
     await ctx
       .http()
       .put(`/attempts/${a.id}/answers/${exam.questionIds.single}`)

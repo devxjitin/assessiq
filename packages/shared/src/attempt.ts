@@ -65,6 +65,8 @@ export interface EnrollmentDto {
     durationMinutes: number;
   };
   attempt: { id: string; status: string; deadlineAt: string } | null;
+  /** Set once the trainer has published results. */
+  result: { score: number; maxScore: number; percent: number; passed: boolean } | null;
   /** The exam window is open and no attempt has ended yet. */
   canStart: boolean;
 }

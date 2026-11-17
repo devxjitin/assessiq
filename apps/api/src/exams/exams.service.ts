@@ -401,6 +401,7 @@ export class ExamsService {
       ...base,
       options: input.options,
       correctOptions: [...input.correctOptions].sort((a, b) => a - b),
+      partialCredit: input.type === 'MULTI' ? input.partialCredit : false,
       rubric: null,
     };
   }
@@ -419,6 +420,7 @@ export class ExamsService {
       correctOptions: q.correctOptions,
       marks: q.marks,
       negativeMarks: q.negativeMarks,
+      partialCredit: q.partialCredit,
       explanation: q.explanation,
       rubric: q.rubric,
     };

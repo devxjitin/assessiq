@@ -791,3 +791,14 @@ tbody tr:last-child td {
 .content-narrow {
   max-width: 680px;
 }
+.q-options li.wrong {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+.answer-box {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--surface-2);
+  white-space: pre-wrap;
+}

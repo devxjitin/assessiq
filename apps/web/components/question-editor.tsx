@@ -23,6 +23,7 @@ export function QuestionEditor({
   const [correct, setCorrect] = useState<number[]>(initial?.correctOptions ?? []);
   const [marks, setMarks] = useState(String(initial?.marks ?? 4));
   const [negative, setNegative] = useState(String(initial?.negativeMarks ?? 0));
+  const [partial, setPartial] = useState(initial?.partialCredit ?? false);
   const [explanation, setExplanation] = useState(initial?.explanation ?? '');
   const [rubric, setRubric] = useState(initial?.rubric ?? '');
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -58,7 +59,12 @@ export function QuestionEditor({
       explanation: explanation || null,
     };
     const candidate = isChoice
-      ? { ...common, options: options.map((o) => o.trim()), correctOptions: correct }
+      ? {
+          ...common,
+          options: options.map((o) => o.trim()),
+          correctOptions: correct,
+          partialCredit: type === 'MULTI' && partial,
+        }
       : { ...common, rubric: rubric || null };
     const result = validate(questionInputSchema, candidate);
     if (!result.ok) {
@@ -133,6 +139,16 @@ export function QuestionEditor({
           ))}
           {errors.options && <small className="error-text">{errors.options}</small>}
           {errors.correctOptions && <small className="error-text">{errors.correctOptions}</small>}
+          {type === 'MULTI' && (
+            <label className="check" style={{ marginTop: 8 }}>
+              <input
+                type="checkbox"
+                checked={partial}
+                onChange={(e) => setPartial(e.target.checked)}
+              />
+              Give partial marks when only some correct options are picked (and none wrong)
+            </label>
+          )}
           {options.length < 6 && (
             <div style={{ marginTop: 8 }}>
               <Button

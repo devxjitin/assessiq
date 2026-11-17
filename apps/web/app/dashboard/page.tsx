@@ -126,25 +126,36 @@ function StudentHome() {
   }, []);
   const states = (items ?? []).map(enrollmentState);
   const count = (...k: string[]) => states.filter((s) => k.includes(s)).length;
+  const published = (items ?? []).filter((e) => e.result);
+  const average = published.length
+    ? Math.round(
+        (published.reduce((s, e) => s + (e.result?.percent ?? 0), 0) / published.length) * 10,
+      ) / 10
+    : null;
   return (
     <>
       <div className="stats">
-        <StatCard label="Joined" value={items?.length ?? '–'} note="exams" icon="book" highlight />
         <StatCard
-          label="Ready or upcoming"
-          value={items ? count('READY', 'UPCOMING') : '–'}
-          note="not started yet"
+          label="Average score"
+          value={average === null ? '–' : `${average}%`}
+          note={
+            average === null
+              ? 'appears when results are published'
+              : `across ${published.length} published result${published.length === 1 ? '' : 's'}`
+          }
+          icon="zap"
+          highlight
+        />
+        <StatCard label="Joined" value={items?.length ?? '–'} note="exams" icon="book" />
+        <StatCard
+          label="Pending"
+          value={items ? count('READY', 'UPCOMING', 'IN_PROGRESS') : '–'}
+          note="not submitted yet"
           icon="clock"
         />
         <StatCard
-          label="In progress"
-          value={items ? count('IN_PROGRESS') : '–'}
-          note="resume any time"
-          icon="edit"
-        />
-        <StatCard
           label="Submitted"
-          value={items ? count('SUBMITTED') : '–'}
+          value={items ? count('SUBMITTED', 'RESULT') : '–'}
           note="exams completed"
           icon="check"
         />

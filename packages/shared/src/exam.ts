@@ -54,6 +54,8 @@ const questionBase = {
 
 const choiceQuestion = {
   ...questionBase,
+  // Multiple-answer only: share the marks when some (but not all) correct options are picked.
+  partialCredit: z.boolean().default(false),
   options: z.array(optionText).min(2).max(6),
   correctOptions: z.array(z.number().int().min(0).max(5)).min(1),
 };
@@ -141,6 +143,7 @@ export interface ExamQuestionDto {
   correctOptions: number[];
   marks: number;
   negativeMarks: number;
+  partialCredit: boolean;
   explanation: string | null;
   rubric: string | null;
 }

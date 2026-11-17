@@ -41,6 +41,13 @@ npm run dev:worker
 
 Still open from Sprint 0: ESLint and commit hooks, design system and wireframes, production Terraform apply, working GitHub Actions (blocked by billing). See the plan file for full status.
 
+## Sprint 5: grading and results (done locally)
+
+- **Marking:** choice questions are marked by the server when an attempt ends. Single answer: right = marks, wrong = minus the penalty, blank = 0. Multiple answer: the exact set earns the marks; with _partial credit_ on, picking only correct options earns a share; anything else costs the penalty. A total never drops below 0.
+- **Trainer:** exam page, **Results** tab (stats, table, CSV export, publish) and `/exams/grade/?exam=&attempt=` to mark written answers. API: `GET /exams/:id/results`, `GET /exams/:id/results.csv`, `GET /exams/:id/attempts/:attemptId`, `PUT /exams/:id/attempts/:attemptId/answers/:questionId/grade`, `POST /exams/:id/finalize`.
+- **Student:** `/result/?id=` (after the trainer publishes), `GET /attempts/:id/result`. Results and correct answers are never sent before publishing.
+- **Publishing rules:** the exam must be closed, nobody still taking it, every written answer marked. Publishing locks all marks.
+
 ## Sprint 4: joining and taking exams (done locally)
 
 - **Student flow:** `/join/` (enter a code, see the exam and the ₹149 fee, pay, enrolled) then the dashboard's **My exams** list, then `/attempt/?id=…` (full-screen exam with countdown, navigator, flagging, autosave).

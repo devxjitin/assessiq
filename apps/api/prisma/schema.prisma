@@ -91,26 +91,28 @@ model User {
 }
 
 model Exam {
-  id               String     @id @default(uuid()) @db.Uuid
-  examinerId       String     @db.Uuid
-  title            String
-  description      String?
-  instructions     String?
-  status           ExamStatus @default(DRAFT)
-  durationMinutes  Int        @default(60)
-  startsAt         DateTime?
-  endsAt           DateTime?
-  passPercent      Float      @default(40)
-  shuffleQuestions Boolean    @default(true)
-  shuffleOptions   Boolean    @default(true)
-  maxStudents      Int        @default(1000)
+  id                 String     @id @default(uuid()) @db.Uuid
+  examinerId         String     @db.Uuid
+  title              String
+  description        String?
+  instructions       String?
+  status             ExamStatus @default(DRAFT)
+  durationMinutes    Int        @default(60)
+  startsAt           DateTime?
+  endsAt             DateTime?
+  passPercent        Float      @default(40)
+  shuffleQuestions   Boolean    @default(true)
+  shuffleOptions     Boolean    @default(true)
+  maxStudents        Int        @default(1000)
   // Certificate logo for this exam (private S3 key). Falls back to the trainer's default logo.
-  logoKey          String?
+  logoKey            String?
   // Share code (e.g. NVX-7K3P9Q), generated when the creation fee is captured.
-  code             String?    @unique
-  publishedAt      DateTime?
-  createdAt        DateTime   @default(now())
-  updatedAt        DateTime   @updatedAt
+  code               String?    @unique
+  publishedAt        DateTime?
+  // Set when the trainer publishes results to students.
+  resultsPublishedAt DateTime?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
 
   examiner    User         @relation(fields: [examinerId], references: [id], onDelete: Restrict)
   questions   Question[]
@@ -133,6 +135,8 @@ model Question {
   correctOptions Int[]
   marks          Float        @default(4)
   negativeMarks  Float        @default(0)
+  // Multiple-answer only: share the marks when only some correct options are picked.
+  partialCredit  Boolean      @default(false)
   explanation    String?
   // Subjective questions only: marking guidance for the grader.
   rubric         String?
@@ -268,6 +272,12 @@ model Attempt {
   // This student's own question order (ids) and option order per question (original indexes).
   questionOrder Json
   optionOrders  Json
+  // Filled in when grading finishes (objective answers at submit, subjective by the trainer).
+  score         Float?
+  maxScore      Float?
+  percent       Float?
+  passed        Boolean?
+  gradedAt      DateTime?
 
   enrollment Enrollment     @relation(fields: [enrollmentId], references: [id], onDelete: Restrict)
   exam       Exam           @relation(fields: [examId], references: [id], onDelete: Restrict)
@@ -280,14 +290,18 @@ model Attempt {
 }
 
 model Answer {
-  id         String   @id @default(uuid()) @db.Uuid
-  attemptId  String   @db.Uuid
-  questionId String   @db.Uuid
+  id           String    @id @default(uuid()) @db.Uuid
+  attemptId    String    @db.Uuid
+  questionId   String    @db.Uuid
   // Choice questions: original option indexes. Subjective: text.
-  selected   Int[]
-  text       String?
-  flagged    Boolean  @default(false)
-  updatedAt  DateTime @updatedAt
+  selected     Int[]
+  text         String?
+  flagged      Boolean   @default(false)
+  // Marks given (auto for choice questions, by the trainer for subjective) and written feedback.
+  marksAwarded Float?
+  feedback     String?
+  gradedAt     DateTime?
+  updatedAt    DateTime  @updatedAt
 
   attempt Attempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
 

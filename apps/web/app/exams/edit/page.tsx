@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { ExamDetailDto, ExamQuestionDto } from '@assessiq/shared';
 import { ExamSettingsForm } from '../../../components/exam-settings-form';
 import { PublishPanel } from '../../../components/publish-panel';
+import { ResultsPanel } from '../../../components/results-panel';
 import { QuestionEditor } from '../../../components/question-editor';
 import {
   Alert,
@@ -17,7 +18,7 @@ import {
 import { ApiError, api, apiBlob } from '../../../lib/api';
 import { useRequireAuth } from '../../../lib/auth';
 
-type Tab = 'questions' | 'import' | 'settings' | 'logo' | 'publish';
+type Tab = 'questions' | 'import' | 'settings' | 'logo' | 'publish' | 'results';
 
 const TYPE_LABEL = {
   SINGLE: 'One correct',
@@ -430,6 +431,7 @@ export default function EditExamPage() {
     ['settings', 'Settings'],
     ['logo', 'Logo'],
     ['publish', locked ? 'Share' : 'Publish'],
+    ...(locked ? ([['results', 'Results']] as [Tab, string][]) : []),
   ];
 
   return (
@@ -466,7 +468,7 @@ export default function EditExamPage() {
 
       {locked && (
         <Alert kind="info">
-          This exam is {exam.status.toLowerCase()} and can no longer be edited.
+          This exam is {exam.status.replace(/_/g, ' ').toLowerCase()} and can no longer be edited.
         </Alert>
       )}
 
@@ -501,6 +503,7 @@ export default function EditExamPage() {
             />
           ))}
         {tab === 'logo' && <LogoTab exam={exam} reload={reload} locked={locked} />}
+        {tab === 'results' && <ResultsPanel exam={exam} reload={reload} />}
         {tab === 'publish' && (
           <PublishPanel exam={exam} userName={user.name} userEmail={user.email} reload={reload} />
         )}

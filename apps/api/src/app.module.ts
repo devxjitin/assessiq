@@ -8,6 +8,7 @@ import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { RolesGuard } from './auth/roles.guard';
 import { ConfigModule } from './config/config.module';
 import { AttemptsModule } from './attempts/attempts.module';
+import { ResultsModule } from './results/results.module';
 import { EnrollmentsModule } from './enrollments/enrollments.module';
 import { PaymentsModule } from './payments/payments.module';
 import { ExamsModule } from './exams/exams.module';
@@ -42,6 +43,7 @@ import { UsersModule } from './users/users.module';
     PaymentsModule,
     EnrollmentsModule,
     AttemptsModule,
+    ResultsModule,
   ],
   controllers: [HealthController],
   providers: [

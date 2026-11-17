@@ -10,10 +10,10 @@ import {
 } from '@assessiq/shared';
 import { AuditService } from '../audit/audit.service';
 import type { AuthUser } from '../common/decorators';
+import { GRACE_MS } from '../common/timing';
 import { PrismaService } from '../prisma/prisma.service';
+import { GradingService } from '../results/grading.service';
 
-/** Answers and submits are accepted this long after the deadline to absorb network lag. */
-const GRACE_MS = 3000;
 /** Blur and tab-hidden usually fire together; events this close count as one strike. */
 const STRIKE_DEBOUNCE_MS = 2000;
 
@@ -33,6 +33,7 @@ export class AttemptsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly grading: GradingService,
   ) {}
 
   // ------------------------------------------------------------------ start
@@ -214,6 +215,7 @@ export class AttemptsService {
         where: { id: attemptId, status: 'IN_PROGRESS' },
         data: { status: 'SUBMITTED', endReason: 'SUBMITTED_BY_STUDENT', submittedAt: new Date() },
       });
+      await this.grading.gradeAttempt(attemptId);
       await this.audit.log({
         actorId: user.id,
         action: 'attempt.submit',
@@ -261,6 +263,7 @@ export class AttemptsService {
           data: { status: 'AUTO_SUBMITTED', endReason: 'STRIKES', submittedAt: now },
         });
         status = 'AUTO_SUBMITTED';
+        await this.grading.gradeAttempt(attemptId);
         await this.audit.log({
           actorId: user.id,
           action: 'attempt.strikes.autosubmit',
@@ -292,6 +295,7 @@ export class AttemptsService {
       where: { id: attempt.id, status: 'IN_PROGRESS' },
       data: { status: 'AUTO_SUBMITTED', endReason: 'TIME_UP', submittedAt: attempt.deadlineAt },
     });
+    await this.grading.gradeAttempt(attempt.id);
     return this.prisma.attempt.findUniqueOrThrow({ where: { id: attempt.id } });
   }
 

@@ -10,7 +10,8 @@ const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString() : '')
 
 export function enrollmentState(
   e: EnrollmentDto,
-): 'SUBMITTED' | 'IN_PROGRESS' | 'UPCOMING' | 'MISSED' | 'READY' {
+): 'RESULT' | 'SUBMITTED' | 'IN_PROGRESS' | 'UPCOMING' | 'MISSED' | 'READY' {
+  if (e.result) return 'RESULT';
   if (e.attempt && e.attempt.status !== 'IN_PROGRESS') return 'SUBMITTED';
   if (e.attempt) return 'IN_PROGRESS';
   const now = Date.now();
@@ -21,8 +22,14 @@ export function enrollmentState(
 
 function statusBadge(e: EnrollmentDto) {
   switch (enrollmentState(e)) {
+    case 'RESULT':
+      return e.result?.passed ? (
+        <StatusBadge status="LIVE" label={`Passed · ${e.result.percent}%`} />
+      ) : (
+        <StatusBadge status="SUSPENDED" label={`Not passed · ${e.result?.percent ?? 0}%`} />
+      );
     case 'SUBMITTED':
-      return <StatusBadge status="RESULTS_FINAL" label="Submitted" />;
+      return <StatusBadge status="PAYMENT_PENDING" label="Submitted · awaiting results" />;
     case 'IN_PROGRESS':
       return <StatusBadge status="GRADING" label="In progress" />;
     case 'UPCOMING':
@@ -86,6 +93,11 @@ export function StudentExams({
           </div>
           <span className="spacer" />
           {statusBadge(e)}
+          {e.result && e.attempt && (
+            <Link className="btn btn-secondary btn-link" href={`/result/?id=${e.attempt.id}`}>
+              View result
+            </Link>
+          )}
           {e.canStart && (
             <Button loading={busyId === e.enrollmentId} onClick={() => begin(e)}>
               {e.attempt ? 'Resume exam' : 'Start exam'}

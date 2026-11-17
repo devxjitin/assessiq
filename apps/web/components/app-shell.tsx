@@ -82,6 +82,8 @@ const CRUMBS: Record<string, string> = {
   preview: 'Preview',
   join: 'Join an exam',
   profile: 'Profile',
+  grade: 'Grade attempt',
+  result: 'Result',
 };
 
 const ROLE_LABEL: Record<string, string> = {
