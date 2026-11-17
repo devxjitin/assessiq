@@ -76,17 +76,22 @@ export class CodeJudgeService implements OnModuleInit, OnModuleDestroy {
     let done = 0;
     for (;;) {
       const batch = await Promise.all(
-        Array.from({ length: this.env.CODE_JUDGE_CONCURRENCY }, () => this.processOne()),
+        Array.from({ length: this.env.CODE_JUDGE_CONCURRENCY }, () => this.claimAndJudge()),
       );
-      const finished = batch.filter(Boolean).length;
-      done += finished;
-      if (finished === 0) return done;
+      // Only jobs this call actually judged count; a lost claim just means look again.
+      done += batch.filter((r) => r === 'judged').length;
+      if (batch.every((r) => r === 'idle')) return done;
     }
   }
 
   /** Claims and grades one job. False when nothing was claimed. */
   async processOne(): Promise<boolean> {
-    if (!this.runner.available) return false;
+    return (await this.claimAndJudge()) !== 'idle';
+  }
+
+  /** 'judged' when this call graded a job, 'lost' when another worker claimed it first. */
+  private async claimAndJudge(): Promise<'judged' | 'lost' | 'idle'> {
+    if (!this.runner.available) return 'idle';
     const stale = new Date(Date.now() - STALE_MS);
     const retryable = new Date(Date.now() - RETRY_AFTER_MS);
     // A queued job with a lock time is one that failed recently; it waits before another try.
@@ -99,14 +104,14 @@ export class CodeJudgeService implements OnModuleInit, OnModuleDestroy {
       where: { OR: claimable },
       orderBy: { createdAt: 'asc' },
     });
-    if (!candidate) return false;
+    if (!candidate) return 'idle';
     const claimed = await this.prisma.codeSubmission.updateMany({
       where: { id: candidate.id, OR: claimable },
       data: { status: 'RUNNING', lockedAt: new Date(), tries: { increment: 1 } },
     });
-    if (claimed.count === 0) return true; // someone else took it; try the next one
+    if (claimed.count === 0) return 'lost'; // someone else took it; try the next one
     await this.judge(candidate.id);
-    return true;
+    return 'judged';
   }
 
   private async judge(jobId: string): Promise<void> {
