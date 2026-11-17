@@ -72,11 +72,7 @@ function navFor(role: string): NavItem[] {
     return [home, { href: '/join/', label: 'Join an exam', icon: 'join' }, profile];
   }
   if (role === 'EXAMINER') {
-    return [
-      home,
-      { href: '/exams/', label: 'My exams', icon: 'exams' },
-      profile,
-    ];
+    return [home, { href: '/exams/', label: 'My exams', icon: 'exams' }, profile];
   }
   return [
     home,

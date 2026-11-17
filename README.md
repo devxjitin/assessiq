@@ -61,7 +61,7 @@ Still open from Sprint 0: ESLint and commit hooks, design system and wireframes,
 
 ## Sprint 7: exam integrity (done locally)
 
-- **Question pools:** exam setting *Questions per student*; each student gets a random N of the questions and is marked out of those.
+- **Question pools:** exam setting _Questions per student_; each student gets a random N of the questions and is marked out of those.
 - **One device per attempt:** the browser's device id (header `X-Device-Id`) is bound to a running attempt; another device gets `403 DEVICE_MISMATCH` until the trainer uses **Release device** (`POST /exams/:id/attempts/:attemptId/release-device`).
 - **Integrity report:** results table badges, and a report plus event timeline (with IPs) on the marking screen.
 - **Join-code limiter:** 8 wrong codes in 10 minutes pauses that student's lookups.
