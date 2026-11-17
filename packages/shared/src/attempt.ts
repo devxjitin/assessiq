@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { CODE_LANGUAGE_KEYS, type CodeLanguage } from './coding';
 
 export const startAttemptSchema = z.object({ enrollmentId: z.string().uuid() });
 export type StartAttemptInput = z.infer<typeof startAttemptSchema>;
@@ -7,7 +8,9 @@ export type StartAttemptInput = z.infer<typeof startAttemptSchema>;
 export const saveAnswerSchema = z
   .object({
     selected: z.array(z.number().int().min(0).max(5)).max(6).optional(),
-    text: z.string().max(20_000).optional(),
+    text: z.string().max(50_000).optional(),
+    /** Coding questions: the language the text is written in. */
+    language: z.enum(CODE_LANGUAGE_KEYS).optional(),
     flagged: z.boolean().optional(),
   })
   .refine((v) => v.selected !== undefined || v.text !== undefined || v.flagged !== undefined, {
@@ -71,10 +74,21 @@ export interface EnrollmentDto {
   canStart: boolean;
 }
 
+/** What a student may know about a coding question: samples only, never the hidden cases. */
+export interface StudentCodingDto {
+  languages: CodeLanguage[];
+  starterCode: Partial<Record<CodeLanguage, string>>;
+  timeLimitMs: number;
+  memoryMb: number;
+  samples: { input: string; expectedOutput: string }[];
+  hiddenCount: number;
+}
+
 export interface AttemptQuestionDto {
   id: string;
   number: number;
-  type: 'SINGLE' | 'MULTI' | 'SUBJECTIVE';
+  type: 'SINGLE' | 'MULTI' | 'SUBJECTIVE' | 'CODING';
+  coding?: StudentCodingDto;
   body: string;
   marks: number;
   negativeMarks: number;
@@ -85,6 +99,7 @@ export interface AttemptQuestionDto {
 export interface AttemptAnswerDto {
   selected: number[];
   text: string;
+  language: string | null;
   flagged: boolean;
 }
 

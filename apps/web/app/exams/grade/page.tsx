@@ -12,8 +12,63 @@ import {
   describeError,
   useQueryParam,
 } from '../../../components/ui';
+import { TestStatusBadge } from '../../../components/code-answer';
 import { api } from '../../../lib/api';
 import { useRequireAuth } from '../../../lib/auth';
+
+function CodingReview({
+  q,
+  examId,
+  attemptId,
+  locked,
+  onSaved,
+}: {
+  q: GradingQuestionDto;
+  examId: string;
+  attemptId: string;
+  locked: boolean;
+  onSaved: () => Promise<void>;
+}) {
+  const s = q.submission;
+  return (
+    <div className="stack">
+      <div className="toolbar">
+        <StatusBadge status="" label={q.language ?? 'no language'} />
+        {s?.status === 'QUEUED' || s?.status === 'RUNNING' ? (
+          <StatusBadge status="PAYMENT_PENDING" label="Being judged…" />
+        ) : s?.status === 'ERROR' ? (
+          <StatusBadge status="SUSPENDED" label="Judging failed: mark by hand" />
+        ) : s ? (
+          <StatusBadge
+            status="PUBLISHED"
+            label={`Passed weight ${s.passedWeight} of ${s.totalWeight}`}
+          />
+        ) : null}
+      </div>
+      <pre className="code-block">{q.text?.trim() ? q.text : '(no code written)'}</pre>
+      {s && s.tests.length > 0 && (
+        <div className="toolbar">
+          {s.tests.map((t, i) => (
+            <span key={t.testId} className="toolbar" style={{ gap: 4 }}>
+              <small className="muted">
+                {t.hidden ? 'Hidden' : 'Sample'} {i + 1}
+              </small>
+              <TestStatusBadge status={t.status} />
+            </span>
+          ))}
+        </div>
+      )}
+      <WrittenAnswer
+        q={{ ...q, text: q.text }}
+        examId={examId}
+        attemptId={attemptId}
+        locked={locked}
+        onSaved={onSaved}
+        hideAnswer
+      />
+    </div>
+  );
+}
 
 const letter = (i: number) => String.fromCharCode(65 + i);
 const END_TEXT: Record<string, string> = {
@@ -28,12 +83,14 @@ function WrittenAnswer({
   attemptId,
   locked,
   onSaved,
+  hideAnswer,
 }: {
   q: GradingQuestionDto;
   examId: string;
   attemptId: string;
   locked: boolean;
   onSaved: () => Promise<void>;
+  hideAnswer?: boolean;
 }) {
   const [marks, setMarks] = useState(q.marksAwarded === null ? '' : String(q.marksAwarded));
   const [feedback, setFeedback] = useState(q.feedback ?? '');
@@ -64,9 +121,11 @@ function WrittenAnswer({
 
   return (
     <div className="stack">
-      <div className="q-body answer-box">
-        {blank ? <em className="muted">No answer written.</em> : q.text}
-      </div>
+      {!hideAnswer && (
+        <div className="q-body answer-box">
+          {blank ? <em className="muted">No answer written.</em> : q.text}
+        </div>
+      )}
       {q.rubric && (
         <p className="muted" style={{ margin: 0 }}>
           <strong>Marking guide:</strong> {q.rubric}
@@ -251,7 +310,15 @@ export default function GradePage() {
           <p className="q-body" style={{ whiteSpace: 'pre-wrap' }}>
             {q.body}
           </p>
-          {q.type === 'SUBJECTIVE' ? (
+          {q.type === 'CODING' ? (
+            <CodingReview
+              q={q}
+              examId={data.examId}
+              attemptId={data.attemptId}
+              locked={data.finalized}
+              onSaved={load}
+            />
+          ) : q.type === 'SUBJECTIVE' ? (
             <WrittenAnswer
               q={q}
               examId={data.examId}

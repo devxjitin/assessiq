@@ -19,6 +19,8 @@ export default defineConfig({
       JWT_ACCESS_SECRET: 'test-access-secret-0123456789abcdef0123456789',
       OTP_SECRET: 'test-otp-secret-0123456789abcdef0123456789ab',
       MAIL_TRANSPORT: 'memory',
+      CODE_RUNNER: 'fake',
+      CODE_JUDGE_POLL: 'off',
       WEB_ORIGIN: 'http://localhost:3000',
     },
   },

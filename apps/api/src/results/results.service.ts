@@ -1,6 +1,9 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import type { CodeSubmission } from '@prisma/client';
 import {
   round2,
+  type CodeSubmissionDto,
+  type GradedTest,
   type AttemptRowDto,
   type ExamResultsDto,
   type GradeAnswerInput,
@@ -13,6 +16,16 @@ import { PrismaService } from '../prisma/prisma.service';
 import { GradingService } from './grading.service';
 
 const UUID = /^[0-9a-f-]{36}$/i;
+
+function toSubmission(job: CodeSubmission | undefined): CodeSubmissionDto | null {
+  if (!job) return null;
+  return {
+    status: job.status,
+    passedWeight: job.passedWeight ?? 0,
+    totalWeight: job.totalWeight ?? 0,
+    tests: (job.results as unknown as GradedTest[] | null) ?? [],
+  };
+}
 
 /** Spreadsheet programs run cells that start with these as formulas; names come from users. */
 function csvCell(value: string | number | null): string {
@@ -62,13 +75,15 @@ export class ResultsService {
     const exam = await this.findOwned(user, examId);
     await this.refresh(exam.id);
 
-    const subjectiveIds = exam.questions.filter((q) => q.type === 'SUBJECTIVE').map((q) => q.id);
+    const writtenIds = exam.questions
+      .filter((q) => q.type === 'SUBJECTIVE' || q.type === 'CODING')
+      .map((q) => q.id);
     const attempts = await this.prisma.attempt.findMany({
       where: { examId: exam.id },
       orderBy: { startedAt: 'asc' },
       include: {
         student: { select: { name: true, email: true } },
-        answers: { where: { questionId: { in: subjectiveIds } } },
+        answers: { where: { questionId: { in: writtenIds } } },
         _count: { select: { events: true } },
       },
     });
@@ -132,6 +147,7 @@ export class ResultsService {
             student: { select: { name: true, email: true } },
             answers: true,
             events: { orderBy: { createdAt: 'asc' } },
+            codeJobs: true,
           },
         })
       : null;
@@ -141,6 +157,7 @@ export class ResultsService {
     }
 
     const byQuestion = new Map(attempt.answers.map((a) => [a.questionId, a]));
+    const jobs = new Map(attempt.codeJobs.map((j) => [j.questionId, j]));
     return {
       attemptId: attempt.id,
       examId: exam.id,
@@ -166,11 +183,12 @@ export class ResultsService {
           : null,
       questions: exam.questions.map((q, i) => {
         const a = byQuestion.get(q.id);
-        const blankWritten = q.type === 'SUBJECTIVE' && !a?.text?.trim();
+        const written = q.type === 'SUBJECTIVE' || q.type === 'CODING';
+        const blankWritten = written && !a?.text?.trim();
         return {
           questionId: q.id,
           number: i + 1,
-          type: q.type as 'SINGLE' | 'MULTI' | 'SUBJECTIVE',
+          type: q.type,
           body: q.body,
           options: q.options,
           correctOptions: q.correctOptions,
@@ -181,7 +199,9 @@ export class ResultsService {
           selected: a?.selected ?? [],
           text: a?.text ?? null,
           // null means "still waiting for the trainer"; a blank written answer is simply 0.
-          marksAwarded: a?.marksAwarded ?? (q.type !== 'SUBJECTIVE' || blankWritten ? 0 : null),
+          language: a?.language ?? null,
+          submission: toSubmission(jobs.get(q.id)),
+          marksAwarded: a?.marksAwarded ?? (!written || blankWritten ? 0 : null),
           feedback: a?.feedback ?? null,
         };
       }),
@@ -200,7 +220,7 @@ export class ResultsService {
       throw new ConflictException('Results are published, so marks can no longer change');
     }
     const question = exam.questions.find((q) => q.id === questionId);
-    if (!question || question.type !== 'SUBJECTIVE') {
+    if (!question || (question.type !== 'SUBJECTIVE' && question.type !== 'CODING')) {
       throw new NotFoundException('Question not found');
     }
     if (input.marks > question.marks) {
@@ -332,7 +352,11 @@ export class ResultsService {
     const attempt = UUID.test(attemptId)
       ? await this.prisma.attempt.findFirst({
           where: { id: attemptId, studentId: user.id },
-          include: { answers: true, exam: { include: { questions: true } } },
+          include: {
+            answers: true,
+            codeJobs: true,
+            exam: { include: { questions: true } },
+          },
         })
       : null;
     if (!attempt) throw new NotFoundException('Attempt not found');
@@ -341,6 +365,7 @@ export class ResultsService {
     }
     const byQuestion = new Map(attempt.answers.map((a) => [a.questionId, a]));
     const byId = new Map(attempt.exam.questions.map((q) => [q.id, q]));
+    const jobs = new Map(attempt.codeJobs.map((j) => [j.questionId, j]));
     const order = attempt.questionOrder as string[];
     return {
       attemptId: attempt.id,
@@ -357,12 +382,14 @@ export class ResultsService {
         return [
           {
             number: i + 1,
-            type: q.type as 'SINGLE' | 'MULTI' | 'SUBJECTIVE',
+            type: q.type,
             body: q.body,
             options: q.options,
             correctOptions: q.correctOptions,
             selected: a?.selected ?? [],
             text: a?.text ?? null,
+            language: a?.language ?? null,
+            submission: toSubmission(jobs.get(id)),
             marks: q.marks,
             marksAwarded: a?.marksAwarded ?? 0,
             explanation: q.explanation,

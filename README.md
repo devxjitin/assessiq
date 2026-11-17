@@ -41,6 +41,16 @@ npm run dev:worker
 
 Still open from Sprint 0: ESLint and commit hooks, design system and wireframes, production Terraform apply, working GitHub Actions (blocked by billing). See the plan file for full status.
 
+## Sprint 6: coding questions (done locally)
+
+- **Question type:** _Coding_ in the exam builder: statement, languages (Python, C, C++, Java, JavaScript), starter code, time and memory limits, test cases that are _sample_ (shown, runnable) or _hidden_ (grading only), each with a weight.
+- **Students:** write code, **Run on samples** (one run per 3 s, 40 per question), submit. After the exam, the judge runs every test; marks = question marks x passed weight / total weight.
+- **API:** `POST /attempts/:id/questions/:questionId/run`; the trainer marks screen can override coding marks like any written answer.
+- **Config:** `CODE_RUNNER=judge0|fake|disabled` (default `disabled`), `JUDGE0_URL`, `JUDGE0_AUTH_TOKEN`, `JUDGE0_LIMIT_MODE=process|cgroup`, `CODE_JUDGE_POLL=on|off`, `CODE_JUDGE_CONCURRENCY`. `fake` returns canned results for tests and demos.
+- **Run Judge0 locally:** see `infra/judge0/docker-compose.yml` (`docker compose -f infra/judge0/docker-compose.yml up -d`), then set `CODE_RUNNER=judge0 JUDGE0_URL=http://localhost:2358`.
+- **Sandbox tests:** `LIVE_JUDGE0_URL=http://localhost:2358 npx vitest run src/code/judge0.live.test.ts` (in `apps/api`).
+- **Production:** `infra/terraform/judge0.tf` creates a separate x86 host (off by default).
+
 ## Sprint 5: grading and results (done locally)
 
 - **Marking:** choice questions are marked by the server when an attempt ends. Single answer: right = marks, wrong = minus the penalty, blank = 0. Multiple answer: the exact set earns the marks; with _partial credit_ on, picking only correct options earns a share; anything else costs the penalty. A total never drops below 0.

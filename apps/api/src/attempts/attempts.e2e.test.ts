@@ -137,6 +137,7 @@ describe('answering', () => {
     expect(reloaded.answers[exam.questionIds.single]).toEqual({
       selected: [2],
       text: '',
+      language: null,
       flagged: true,
     });
     expect(reloaded.answers[exam.questionIds.multi].selected).toEqual([0, 1]);

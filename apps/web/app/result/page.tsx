@@ -11,6 +11,7 @@ import {
   describeError,
   useQueryParam,
 } from '../../components/ui';
+import { TestStatusBadge } from '../../components/code-answer';
 import { ApiError, api } from '../../lib/api';
 import { useRequireAuth } from '../../lib/auth';
 
@@ -103,7 +104,29 @@ export default function ResultPage() {
             </span>
           </div>
           <p style={{ whiteSpace: 'pre-wrap' }}>{q.body}</p>
-          {q.type === 'SUBJECTIVE' ? (
+          {q.type === 'CODING' ? (
+            <div className="stack">
+              <StatusBadge status="" label={q.language ?? 'no language'} />
+              <pre className="code-block">{q.text?.trim() ? q.text : '(no code written)'}</pre>
+              {q.submission && q.submission.tests.length > 0 && (
+                <div className="toolbar">
+                  {q.submission.tests.map((t, i) => (
+                    <span key={t.testId} className="toolbar" style={{ gap: 4 }}>
+                      <small className="muted">
+                        {t.hidden ? 'Hidden' : 'Sample'} {i + 1}
+                      </small>
+                      <TestStatusBadge status={t.status} />
+                    </span>
+                  ))}
+                </div>
+              )}
+              {q.feedback && (
+                <Alert kind="info">
+                  <strong>Trainer feedback:</strong> {q.feedback}
+                </Alert>
+              )}
+            </div>
+          ) : q.type === 'SUBJECTIVE' ? (
             <div className="stack">
               <div className="q-body answer-box">
                 {q.text?.trim() ? q.text : <em className="muted">You did not write an answer.</em>}

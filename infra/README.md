@@ -14,7 +14,7 @@
 - **Email:** SES domain identity with DKIM, a configuration set, and an SNS topic for bounces and complaints.
 - **Budget:** monthly $100 limit with alerts at $20 / $50 / $80 (created by staging only).
 
-Not included yet: Judge0 (Sprint 6, runs on the EC2 host via Compose), Route 53 (DNS stays at GoDaddy), WAF, Multi-AZ (Stage B).
+Judge0 (Sprint 6) is a separate, optional host: `judge0.tf`, off unless `enable_judge0 = true`. Not included yet: Route 53 (DNS stays at GoDaddy), WAF, Multi-AZ (Stage B).
 
 ## One-time setup (you, in the AWS console)
 

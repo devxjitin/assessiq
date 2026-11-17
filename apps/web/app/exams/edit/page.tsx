@@ -24,6 +24,7 @@ const TYPE_LABEL = {
   SINGLE: 'One correct',
   MULTI: 'Several correct',
   SUBJECTIVE: 'Subjective',
+  CODING: 'Coding',
 } as const;
 
 interface ImportResult {
@@ -135,6 +136,14 @@ function QuestionsTab({
               </ul>
             )}
             {q.rubric && <p className="muted">Guidance: {q.rubric}</p>}
+            {q.coding && (
+              <p className="muted">
+                {q.coding.languages.join(', ')} ·{' '}
+                {q.coding.testCases.filter((t) => !t.hidden).length} sample and{' '}
+                {q.coding.testCases.filter((t) => t.hidden).length} hidden test cases ·{' '}
+                {q.coding.timeLimitMs / 1000}s, {q.coding.memoryMb} MB
+              </p>
+            )}
           </div>
         ),
       )}

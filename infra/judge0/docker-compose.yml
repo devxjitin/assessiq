@@ -1,0 +1,34 @@
+# Local Judge0 CE for developing and testing coding questions (x86 images; runs under emulation on ARM).
+#   docker compose -f infra/judge0/docker-compose.yml up -d
+# then: CODE_RUNNER=judge0 JUDGE0_URL=http://localhost:2358
+# Production uses infra/terraform/judge0.tf, which runs the same stack on its own host.
+services:
+  server:
+    image: judge0/judge0:1.13.1
+    privileged: true
+    ports: ['2358:2358']
+    environment: &env
+      REDIS_HOST: redis
+      POSTGRES_HOST: db
+      POSTGRES_DB: judge0
+      POSTGRES_USER: judge0
+      POSTGRES_PASSWORD: judge0-local-only
+      ENABLE_NETWORK: 'false'
+      # Node.js and Java need a large address-space limit (see JUDGE0_LIMIT_MODE=process).
+      MAX_MEMORY_LIMIT: '4000000'
+      MAX_CPU_TIME_LIMIT: '15'
+    depends_on: [db, redis]
+  workers:
+    image: judge0/judge0:1.13.1
+    command: ['./scripts/workers']
+    privileged: true
+    environment: *env
+    depends_on: [db, redis]
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: judge0
+      POSTGRES_USER: judge0
+      POSTGRES_PASSWORD: judge0-local-only
+  redis:
+    image: redis:7-alpine

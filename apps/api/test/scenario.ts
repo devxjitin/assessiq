@@ -7,6 +7,8 @@ export interface PublishedExam {
   examId: string;
   code: string;
   questionIds: { single: string; multi: string; subjective: string };
+  /** Ids of the extra questions passed to publishExam, in order. */
+  extraIds: string[];
 }
 
 /** A trainer creates a 3-question exam and pays to publish it (fake gateway). */
@@ -14,6 +16,7 @@ export async function publishExam(
   ctx: TestContext,
   trainer: { accessToken: string },
   settings: Record<string, unknown> = {},
+  extra: object[] = [],
 ): Promise<PublishedExam> {
   const exam = await ctx
     .http()
@@ -52,6 +55,8 @@ export async function publishExam(
     marks: 5,
     rubric: 'SECRET RUBRIC',
   });
+  const extraIds: string[] = [];
+  for (const q of extra) extraIds.push(await add(q));
 
   const order = (await ctx.http().post(`/exams/${id}/publish-order`).set(auth(trainer)).expect(200))
     .body;
@@ -68,6 +73,7 @@ export async function publishExam(
     examId: id,
     code: done.body.exam.code as string,
     questionIds: { single, multi, subjective },
+    extraIds,
   };
 }
 

@@ -8,6 +8,7 @@ import type {
   ProctorEventType,
   SaveAnswerInput,
 } from '@assessiq/shared';
+import { CodeAnswer } from '../../components/code-answer';
 import { Alert, Button, useQueryParam } from '../../components/ui';
 import { ApiError, api } from '../../lib/api';
 import { useRequireAuth } from '../../lib/auth';
@@ -30,6 +31,7 @@ function clock(totalSeconds: number): string {
 }
 
 const isAnswered = (a?: AttemptAnswerDto) => Boolean(a && (a.selected.length > 0 || a.text.trim()));
+const blank = (): AttemptAnswerDto => ({ selected: [], text: '', language: null, flagged: false });
 
 export default function AttemptPage() {
   const { user, loading } = useRequireAuth();
@@ -103,12 +105,13 @@ export default function AttemptPage() {
   const change = useCallback(
     (qid: string, patch: SaveAnswerInput) => {
       setAnswers((prev) => {
-        const cur = prev[qid] ?? { selected: [], text: '', flagged: false };
+        const cur = prev[qid] ?? blank();
         return {
           ...prev,
           [qid]: {
             selected: patch.selected ?? cur.selected,
             text: patch.text ?? cur.text,
+            language: patch.language ?? cur.language,
             flagged: patch.flagged ?? cur.flagged,
           },
         };
@@ -321,7 +324,7 @@ export default function AttemptPage() {
   }
 
   const q = attempt.questions[current];
-  const a = answers[q.id] ?? { selected: [], text: '', flagged: false };
+  const a = answers[q.id] ?? blank();
   const answeredCount = attempt.questions.filter((x) => isAnswered(answers[x.id])).length;
 
   return (
@@ -395,7 +398,15 @@ export default function AttemptPage() {
             {q.body}
           </div>
 
-          {q.type === 'SUBJECTIVE' ? (
+          {q.type === 'CODING' && q.coding ? (
+            <CodeAnswer
+              key={q.id}
+              attemptId={attempt.id}
+              question={q}
+              answer={a}
+              onChange={(patch) => change(q.id, patch)}
+            />
+          ) : q.type === 'SUBJECTIVE' ? (
             <textarea
               value={a.text}
               onChange={(e) => change(q.id, { text: e.target.value })}

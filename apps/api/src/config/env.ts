@@ -15,6 +15,16 @@ const schema = z.object({
   RAZORPAY_KEY_ID: z.string().optional(),
   RAZORPAY_KEY_SECRET: z.string().optional(),
   RAZORPAY_WEBHOOK_SECRET: z.string().optional(),
+  // Code execution for coding questions. 'judge0' = self-hosted Judge0, 'fake' = canned results
+  // for tests/dev, 'disabled' = coding questions can be written but not run or auto-graded.
+  CODE_RUNNER: z.enum(['judge0', 'fake', 'disabled']).default('disabled'),
+  JUDGE0_URL: z.string().default('http://localhost:2358'),
+  JUDGE0_AUTH_TOKEN: z.string().optional(),
+  // 'process' works on cgroup v2 hosts (Amazon Linux 2023); 'cgroup' needs a cgroup v1 host.
+  JUDGE0_LIMIT_MODE: z.enum(['process', 'cgroup']).default('process'),
+  // 'on' starts the background judge that grades queued coding answers.
+  CODE_JUDGE_POLL: z.enum(['on', 'off']).default('on'),
+  CODE_JUDGE_CONCURRENCY: z.coerce.number().int().min(1).max(32).default(4),
   AWS_REGION: z.string().default('ap-south-1'),
   // Private file storage (exam logos, later certificates). `memory` is for tests/local dev.
   STORAGE_DRIVER: z.enum(['s3', 'memory']).default('memory'),

@@ -2,9 +2,16 @@
 
 import { useState } from 'react';
 import { questionInputSchema, type ExamQuestionDto } from '@assessiq/shared';
+import {
+  CodingFields,
+  draftFromSpec,
+  draftToInput,
+  emptyCodingDraft,
+  type CodingDraft,
+} from './coding-fields';
 import { Alert, Button, FieldErrors, describeError, validate } from './ui';
 
-type Kind = 'SINGLE' | 'MULTI' | 'SUBJECTIVE';
+type Kind = 'SINGLE' | 'MULTI' | 'SUBJECTIVE' | 'CODING';
 
 export function QuestionEditor({
   initial,
@@ -26,11 +33,14 @@ export function QuestionEditor({
   const [partial, setPartial] = useState(initial?.partialCredit ?? false);
   const [explanation, setExplanation] = useState(initial?.explanation ?? '');
   const [rubric, setRubric] = useState(initial?.rubric ?? '');
+  const [coding, setCoding] = useState<CodingDraft>(
+    initial?.coding ? draftFromSpec(initial.coding) : emptyCodingDraft(),
+  );
   const [errors, setErrors] = useState<FieldErrors>({});
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
 
-  const isChoice = type !== 'SUBJECTIVE';
+  const isChoice = type === 'SINGLE' || type === 'MULTI';
 
   function changeType(next: Kind) {
     setType(next);
@@ -58,14 +68,17 @@ export function QuestionEditor({
       negativeMarks: Number(negative),
       explanation: explanation || null,
     };
-    const candidate = isChoice
-      ? {
-          ...common,
-          options: options.map((o) => o.trim()),
-          correctOptions: correct,
-          partialCredit: type === 'MULTI' && partial,
-        }
-      : { ...common, rubric: rubric || null };
+    const candidate =
+      type === 'CODING'
+        ? { ...common, coding: draftToInput(coding) }
+        : isChoice
+          ? {
+              ...common,
+              options: options.map((o) => o.trim()),
+              correctOptions: correct,
+              partialCredit: type === 'MULTI' && partial,
+            }
+          : { ...common, rubric: rubric || null };
     const result = validate(questionInputSchema, candidate);
     if (!result.ok) {
       setErrors(result.errors);
@@ -93,6 +106,7 @@ export function QuestionEditor({
           <option value="SINGLE">Multiple choice, one correct answer</option>
           <option value="MULTI">Multiple choice, several correct answers</option>
           <option value="SUBJECTIVE">Subjective (written answer)</option>
+          <option value="CODING">Coding (auto-graded with test cases)</option>
         </select>
       </label>
       <label className="field">
@@ -164,7 +178,11 @@ export function QuestionEditor({
         </div>
       )}
 
-      {!isChoice && (
+      {type === 'CODING' && (
+        <CodingFields draft={coding} onChange={setCoding} error={errors.coding} />
+      )}
+
+      {type === 'SUBJECTIVE' && (
         <label className="field">
           <span>Marking guidance for you (students never see this)</span>
           <textarea value={rubric} onChange={(e) => setRubric(e.target.value)} maxLength={3000} />

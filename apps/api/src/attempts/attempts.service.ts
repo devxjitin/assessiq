@@ -1,9 +1,24 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  HttpException,
+  HttpStatus,
+  Inject,
+  Injectable,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { Attempt, Prisma, Question } from '@prisma/client';
 import { randomInt } from 'node:crypto';
 import {
+  CODING_LIMITS,
   LIMITS,
   STRIKE_EVENTS,
+  outputsMatch,
+  toStudentCoding,
+  type CodingSpec,
+  type RunCodeInput,
+  type RunResultDto,
+  type SampleRunResult,
   type AttemptDto,
   type ProctorEventInput,
   type SaveAnswerInput,
@@ -12,6 +27,8 @@ import { AuditService } from '../audit/audit.service';
 import type { AuthUser } from '../common/decorators';
 import { GRACE_MS } from '../common/timing';
 import { PrismaService } from '../prisma/prisma.service';
+import { CODE_RUNNER, CodeRunner } from '../code/code-runner';
+import { toTestStatus } from '../code/code-judge.service';
 import { GradingService } from '../results/grading.service';
 
 /** Blur and tab-hidden usually fire together; events this close count as one strike. */
@@ -34,6 +51,7 @@ export class AttemptsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly grading: GradingService,
+    @Inject(CODE_RUNNER) private readonly runner: CodeRunner,
   ) {}
 
   // ------------------------------------------------------------------ start
@@ -127,17 +145,25 @@ export class AttemptsService {
           {
             id: q.id,
             number: i + 1,
-            type: q.type as 'SINGLE' | 'MULTI' | 'SUBJECTIVE',
+            type: q.type as 'SINGLE' | 'MULTI' | 'SUBJECTIVE' | 'CODING',
             body: q.body,
             marks: q.marks,
             negativeMarks: q.negativeMarks,
+            ...(q.type === 'CODING' && q.coding
+              ? { coding: toStudentCoding(q.coding as unknown as CodingSpec) }
+              : {}),
             options: (optionOrders[q.id] ?? []).map((idx) => ({ id: idx, text: q.options[idx] })),
           },
         ];
       });
       const saved = await this.prisma.answer.findMany({ where: { attemptId } });
       for (const a of saved) {
-        answers[a.questionId] = { selected: a.selected, text: a.text ?? '', flagged: a.flagged };
+        answers[a.questionId] = {
+          selected: a.selected,
+          text: a.text ?? '',
+          language: a.language,
+          flagged: a.flagged,
+        };
       }
     }
 
@@ -178,8 +204,16 @@ export class AttemptsService {
 
     let selected: number[] | undefined;
     let text: string | undefined;
+    let language: string | undefined;
     if (question.type === 'SUBJECTIVE') {
       text = input.text;
+    } else if (question.type === 'CODING') {
+      text = input.text;
+      language = input.language;
+      const spec = question.coding as unknown as CodingSpec;
+      if (language && !spec.languages.includes(language as never)) {
+        throw new ConflictException('That language is not allowed for this question');
+      }
     } else if (input.selected !== undefined) {
       const unique = [...new Set(input.selected)];
       if (unique.some((i) => i >= question.options.length)) {
@@ -198,11 +232,112 @@ export class AttemptsService {
         questionId,
         selected: selected ?? [],
         text: text ?? null,
+        language: language ?? null,
         flagged: input.flagged ?? false,
       },
-      update: { selected, text, flagged: input.flagged },
+      update: { selected, text, language, flagged: input.flagged },
     });
     return { saved: true };
+  }
+
+  // ------------------------------------------------------------ run samples
+
+  /**
+   * "Run" button: executes the student's code on the sample cases only. Hidden cases are never
+   * run here, so a student cannot probe them. Runs are limited per question.
+   */
+  async runSamples(
+    user: AuthUser,
+    attemptId: string,
+    questionId: string,
+    input: RunCodeInput,
+  ): Promise<RunResultDto> {
+    const attempt = await this.load(user, attemptId);
+    this.assertWritable(attempt);
+    if (!UUID.test(questionId) || !(attempt.questionOrder as string[]).includes(questionId)) {
+      throw new NotFoundException('Question not found');
+    }
+    const question = await this.prisma.question.findUniqueOrThrow({ where: { id: questionId } });
+    const spec = question.coding as unknown as CodingSpec | null;
+    if (question.type !== 'CODING' || !spec) throw new NotFoundException('Question not found');
+    if (!spec.languages.includes(input.language)) {
+      throw new ConflictException('That language is not allowed for this question');
+    }
+    if (!this.runner.available) {
+      throw new ServiceUnavailableException('Running code is not available right now');
+    }
+
+    // Reserve a run first (atomic), so rapid clicks cannot exceed the budget.
+    const now = new Date();
+    await this.prisma.answer.upsert({
+      where: { attemptId_questionId: { attemptId, questionId } },
+      create: { attemptId, questionId, selected: [], text: input.source, language: input.language },
+      update: {},
+    });
+    const cutoff = new Date(now.getTime() - CODING_LIMITS.RUN_COOLDOWN_MS);
+    const reserved = await this.prisma.answer.updateMany({
+      where: {
+        attemptId,
+        questionId,
+        runs: { lt: CODING_LIMITS.MAX_RUNS_PER_QUESTION },
+        OR: [{ lastRunAt: null }, { lastRunAt: { lt: cutoff } }],
+      },
+      data: {
+        runs: { increment: 1 },
+        lastRunAt: now,
+        text: input.source,
+        language: input.language,
+      },
+    });
+    if (reserved.count === 0) {
+      const a = await this.prisma.answer.findUniqueOrThrow({
+        where: { attemptId_questionId: { attemptId, questionId } },
+      });
+      if (a.runs >= CODING_LIMITS.MAX_RUNS_PER_QUESTION) {
+        throw new HttpException(
+          'You have used all your runs for this question',
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
+      throw new HttpException('Wait a few seconds between runs', HttpStatus.TOO_MANY_REQUESTS);
+    }
+
+    const results: SampleRunResult[] = [];
+    for (const t of spec.testCases.filter((c) => !c.hidden)) {
+      try {
+        const out = await this.runner.run({
+          language: input.language,
+          source: input.source,
+          stdin: t.input,
+          timeLimitMs: spec.timeLimitMs,
+          memoryMb: spec.memoryMb,
+        });
+        results.push({
+          input: t.input,
+          expectedOutput: t.expectedOutput,
+          actualOutput: out.stdout.slice(0, 2000),
+          message: out.stderr.slice(0, 1000),
+          status: toTestStatus(
+            out,
+            out.status === 'OK' && outputsMatch(t.expectedOutput, out.stdout),
+          ),
+          timeMs: out.timeMs,
+        });
+      } catch {
+        // The sandbox failed, not the student's code: give the run back and say so.
+        await this.prisma.answer.updateMany({
+          where: { attemptId, questionId },
+          data: { runs: { decrement: 1 } },
+        });
+        throw new ServiceUnavailableException('Running code is not available right now');
+      }
+    }
+    const used = (
+      await this.prisma.answer.findUniqueOrThrow({
+        where: { attemptId_questionId: { attemptId, questionId } },
+      })
+    ).runs;
+    return { runsLeft: Math.max(0, CODING_LIMITS.MAX_RUNS_PER_QUESTION - used), results };
   }
 
   // ----------------------------------------------------------------- submit

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { CodeSubmissionDto } from './coding';
 
 /** Rounds to 2 decimals so partial credit never leaves float noise like 1.3333333. */
 export const round2 = (n: number): number => Math.round(n * 100) / 100;
@@ -113,7 +114,7 @@ export interface ExamResultsDto {
 export interface GradingQuestionDto {
   questionId: string;
   number: number;
-  type: 'SINGLE' | 'MULTI' | 'SUBJECTIVE';
+  type: 'SINGLE' | 'MULTI' | 'SUBJECTIVE' | 'CODING';
   body: string;
   options: string[];
   correctOptions: number[];
@@ -122,7 +123,11 @@ export interface GradingQuestionDto {
   explanation: string | null;
   rubric: string | null;
   selected: number[];
+  /** Written answer, or the source code for coding questions. */
   text: string | null;
+  language: string | null;
+  /** Coding questions: the automatic judging outcome. */
+  submission: CodeSubmissionDto | null;
   marksAwarded: number | null;
   feedback: string | null;
 }
@@ -148,12 +153,14 @@ export interface StudentResultDto extends ResultSummaryDto {
   passPercent: number;
   questions: {
     number: number;
-    type: 'SINGLE' | 'MULTI' | 'SUBJECTIVE';
+    type: 'SINGLE' | 'MULTI' | 'SUBJECTIVE' | 'CODING';
     body: string;
     options: string[];
     correctOptions: number[];
     selected: number[];
     text: string | null;
+    language: string | null;
+    submission: CodeSubmissionDto | null;
     marks: number;
     marksAwarded: number;
     explanation: string | null;

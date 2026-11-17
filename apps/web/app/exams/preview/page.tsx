@@ -64,7 +64,23 @@ export default function PreviewPage() {
               <div className="q-body" style={{ whiteSpace: 'pre-wrap' }}>
                 {q.body}
               </div>
-              {q.type === 'SUBJECTIVE' ? (
+              {q.type === 'CODING' && q.coding ? (
+                <div className="stack">
+                  <small className="muted">
+                    Students write code in {q.coding.languages.join(', ')} and can run it on{' '}
+                    {q.coding.samples.length} sample case(s); {q.coding.hiddenCount} hidden case(s)
+                    are used for grading.
+                  </small>
+                  {q.coding.samples.map((s, i) => (
+                    <div className="q-item" key={i}>
+                      <small className="muted">Sample input</small>
+                      <pre className="code-block">{s.input || '(empty)'}</pre>
+                      <small className="muted">Expected output</small>
+                      <pre className="code-block">{s.expectedOutput}</pre>
+                    </div>
+                  ))}
+                </div>
+              ) : q.type === 'SUBJECTIVE' ? (
                 <textarea
                   disabled
                   placeholder="Students type their answer here"

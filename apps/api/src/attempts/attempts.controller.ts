@@ -2,6 +2,8 @@ import { Body, Controller, Get, HttpCode, Param, Post, Put } from '@nestjs/commo
 import { SkipThrottle } from '@nestjs/throttler';
 import {
   proctorEventSchema,
+  runCodeSchema,
+  type RunCodeInput,
   saveAnswerSchema,
   startAttemptSchema,
   type ProctorEventInput,
@@ -54,6 +56,17 @@ export class AttemptsController {
     @Body(new ZodValidationPipe(saveAnswerSchema)) body: SaveAnswerInput,
   ) {
     return this.attempts.saveAnswer(user, id, questionId, body);
+  }
+
+  @Post(':id/questions/:questionId/run')
+  @HttpCode(200)
+  run(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Param('questionId') questionId: string,
+    @Body(new ZodValidationPipe(runCodeSchema)) body: RunCodeInput,
+  ) {
+    return this.attempts.runSamples(user, id, questionId, body);
   }
 
   @Post(':id/submit')

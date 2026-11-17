@@ -36,6 +36,21 @@ export class GradingService {
           awarded.push(0); // left blank: nothing to read, nothing to award
         } else if (a.marksAwarded === null) {
           pending++;
+          if (q.type === 'CODING') {
+            // Queue it for automatic judging; the unique key makes this safe to repeat.
+            writes.push(
+              this.prisma.codeSubmission.upsert({
+                where: { attemptId_questionId: { attemptId: attempt.id, questionId: q.id } },
+                create: {
+                  attemptId: attempt.id,
+                  questionId: q.id,
+                  language: a.language ?? 'python',
+                  source: a.text ?? '',
+                },
+                update: {},
+              }),
+            );
+          }
         } else {
           awarded.push(a.marksAwarded);
         }

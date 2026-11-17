@@ -137,6 +137,8 @@ model Question {
   negativeMarks  Float        @default(0)
   // Multiple-answer only: share the marks when only some correct options are picked.
   partialCredit  Boolean      @default(false)
+  // Coding questions only: languages, starter code, limits and test cases (see CodingSpec).
+  coding         Json?
   explanation    String?
   // Subjective questions only: marking guidance for the grader.
   rubric         String?
@@ -257,6 +259,37 @@ model Enrollment {
 }
 
 // One attempt per enrollment. The deadline is fixed by the server when the attempt starts.
+enum CodeJobStatus {
+  QUEUED
+  RUNNING
+  DONE
+  ERROR
+}
+
+// One automatic judging job per coding answer, created when the attempt ends.
+model CodeSubmission {
+  id           String        @id @default(uuid()) @db.Uuid
+  attemptId    String        @db.Uuid
+  questionId   String        @db.Uuid
+  language     String
+  source       String
+  status       CodeJobStatus @default(QUEUED)
+  tries        Int           @default(0)
+  lockedAt     DateTime?
+  passedWeight Float?
+  totalWeight  Float?
+  // Per-test outcome: [{ testId, hidden, status, passed, timeMs }]
+  results      Json?
+  error        String?
+  createdAt    DateTime      @default(now())
+  finishedAt   DateTime?
+
+  attempt Attempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+
+  @@unique([attemptId, questionId])
+  @@index([status, createdAt])
+}
+
 model Attempt {
   id            String        @id @default(uuid()) @db.Uuid
   enrollmentId  String        @unique @db.Uuid
@@ -279,11 +312,12 @@ model Attempt {
   passed        Boolean?
   gradedAt      DateTime?
 
-  enrollment Enrollment     @relation(fields: [enrollmentId], references: [id], onDelete: Restrict)
-  exam       Exam           @relation(fields: [examId], references: [id], onDelete: Restrict)
-  student    User           @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  enrollment Enrollment       @relation(fields: [enrollmentId], references: [id], onDelete: Restrict)
+  exam       Exam             @relation(fields: [examId], references: [id], onDelete: Restrict)
+  student    User             @relation(fields: [studentId], references: [id], onDelete: Restrict)
   answers    Answer[]
   events     ProctorEvent[]
+  codeJobs   CodeSubmission[]
 
   @@index([examId, status])
   @@index([studentId])
@@ -301,6 +335,10 @@ model Answer {
   marksAwarded Float?
   feedback     String?
   gradedAt     DateTime?
+  // Coding questions: language of the source in `text`, and the sample-run budget used so far.
+  language     String?
+  runs         Int       @default(0)
+  lastRunAt    DateTime?
   updatedAt    DateTime  @updatedAt
 
   attempt Attempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)

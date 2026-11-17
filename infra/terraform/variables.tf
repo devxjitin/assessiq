@@ -34,6 +34,18 @@ variable "ec2_instance_type" {
   default     = "t4g.medium"
 }
 
+variable "enable_judge0" {
+  description = "Create the code-execution host for coding questions (costs extra per month)."
+  type        = bool
+  default     = false
+}
+
+variable "judge0_instance_type" {
+  description = "Judge0 needs an x86 host (its image has no ARM build) and about 4 GB of memory."
+  type        = string
+  default     = "t3.medium"
+}
+
 variable "ec2_root_volume_gb" {
   type    = number
   default = 30

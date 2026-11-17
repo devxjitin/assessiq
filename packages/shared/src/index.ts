@@ -6,3 +6,4 @@ export * from './money';
 export * from './payment';
 export * from './attempt';
 export * from './grading';
+export * from './coding';

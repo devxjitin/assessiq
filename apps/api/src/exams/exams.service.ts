@@ -9,6 +9,8 @@ import { Exam, Prisma, Question } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import {
   LIMITS,
+  toStudentCoding,
+  type CodingSpec,
   type CreateExamInput,
   type ExamDetailDto,
   type ExamPreviewDto,
@@ -162,8 +164,14 @@ export class ExamsService {
       totalMarks: this.totalMarks(exam.questions),
       passPercent: exam.passPercent,
       questions: exam.questions.map((q) => {
-        const { correctOptions: _c, explanation: _e, rubric: _r, ...visible } = this.toQuestion(q);
-        return visible;
+        const {
+          correctOptions: _c,
+          explanation: _e,
+          rubric: _r,
+          coding,
+          ...visible
+        } = this.toQuestion(q);
+        return { ...visible, coding: coding ? toStudentCoding(coding) : null };
       }),
     };
   }
@@ -397,6 +405,19 @@ export class ExamsService {
     if (input.type === 'SUBJECTIVE') {
       return { ...base, options: [], correctOptions: [], rubric: input.rubric ?? null };
     }
+    if (input.type === 'CODING') {
+      const coding: CodingSpec = {
+        ...input.coding,
+        testCases: input.coding.testCases.map((t) => ({ ...t, id: randomUUID() })),
+      };
+      return {
+        ...base,
+        options: [],
+        correctOptions: [],
+        rubric: null,
+        coding: coding as unknown as Prisma.InputJsonValue,
+      };
+    }
     return {
       ...base,
       options: input.options,
@@ -421,6 +442,7 @@ export class ExamsService {
       marks: q.marks,
       negativeMarks: q.negativeMarks,
       partialCredit: q.partialCredit,
+      coding: (q.coding as unknown as CodingSpec | null) ?? null,
       explanation: q.explanation,
       rubric: q.rubric,
     };

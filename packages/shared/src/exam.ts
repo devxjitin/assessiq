@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { codingSpecInputSchema, type CodingSpec } from './coding';
+import type { StudentCodingDto } from './attempt';
 import { LIMITS } from './constants';
 
 /** Settings a trainer controls on a draft exam. */
@@ -100,6 +102,11 @@ export const questionInputSchema = z
     z.object({ type: z.literal('SINGLE'), ...choiceQuestion }),
     z.object({ type: z.literal('MULTI'), ...choiceQuestion }),
     z.object({
+      type: z.literal('CODING'),
+      ...questionBase,
+      coding: codingSpecInputSchema,
+    }),
+    z.object({
       type: z.literal('SUBJECTIVE'),
       ...questionBase,
       // Guidance for whoever marks the answer.
@@ -137,13 +144,15 @@ export type ImportQuestionsInput = z.infer<typeof importQuestionsSchema>;
 export interface ExamQuestionDto {
   id: string;
   position: number;
-  type: 'SINGLE' | 'MULTI' | 'SUBJECTIVE';
+  type: 'SINGLE' | 'MULTI' | 'SUBJECTIVE' | 'CODING';
   body: string;
   options: string[];
   correctOptions: number[];
   marks: number;
   negativeMarks: number;
   partialCredit: boolean;
+  /** Coding questions only. */
+  coding: CodingSpec | null;
   explanation: string | null;
   rubric: string | null;
 }
@@ -176,7 +185,10 @@ export interface ExamDetailDto extends ExamSummaryDto {
 }
 
 /** What a student sees: no correct answers, no explanations, no rubric. */
-export type PreviewQuestionDto = Omit<ExamQuestionDto, 'correctOptions' | 'explanation' | 'rubric'>;
+export type PreviewQuestionDto = Omit<
+  ExamQuestionDto,
+  'correctOptions' | 'explanation' | 'rubric' | 'coding'
+> & { coding: StudentCodingDto | null };
 
 export interface ExamPreviewDto {
   id: string;
