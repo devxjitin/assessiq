@@ -285,6 +285,17 @@ function StudentHome() {
   );
 }
 
+const OVER = ['CLOSED', 'GRADING', 'RESULTS_FINAL', 'CERT_PENDING_APPROVAL', 'CERT_RELEASED'];
+
+/** Where an exam stands today, from its status and exam window. */
+function examPhase(e: ExamSummaryDto, now: number): 'draft' | 'scheduled' | 'open' | 'conducted' {
+  if (e.status === 'DRAFT' || e.status === 'PAYMENT_PENDING') return 'draft';
+  if (OVER.includes(e.status)) return 'conducted';
+  if (e.endsAt && new Date(e.endsAt).getTime() < now) return 'conducted';
+  if (e.startsAt && new Date(e.startsAt).getTime() > now) return 'scheduled';
+  return 'open';
+}
+
 function TrainerHome() {
   const [exams, setExams] = useState<ExamSummaryDto[] | null>(null);
   const [error, setError] = useState('');
@@ -294,41 +305,27 @@ function TrainerHome() {
       .catch(() => setError('Could not load your exams.'));
   }, []);
   const list = exams ?? [];
+  const now = Date.now();
+  const count = (phase: ReturnType<typeof examPhase>) =>
+    exams ? list.filter((e) => examPhase(e, now) === phase).length : '–';
   return (
     <>
       <Certificates />
       <div className="stats">
         <StatCard
-          label="Exams"
-          value={exams ? list.length : '–'}
-          note="created"
-          icon="exams"
-          highlight
+          label="Scheduled"
+          value={count('scheduled')}
+          note="upcoming exams"
+          icon="schedule"
         />
+        <StatCard label="Published" value={count('open')} note="open for students" icon="publish" />
         <StatCard
-          label="Students joined"
-          value={exams ? list.reduce((n, e) => n + (e.joinedCount ?? 0), 0) : '–'}
-          note="across all exams"
-          icon="users"
+          label="Conducted"
+          value={count('conducted')}
+          note="completed exams"
+          icon="conducted"
         />
-        <StatCard
-          label="Published"
-          value={exams ? list.filter((e) => e.status !== 'DRAFT').length : '–'}
-          note="open for students"
-          icon="check"
-        />
-        <StatCard
-          label="Drafts"
-          value={exams ? list.filter((e) => e.status === 'DRAFT').length : '–'}
-          note="not published yet"
-          icon="edit"
-        />
-        <StatCard
-          label="Questions"
-          value={exams ? list.reduce((n, e) => n + e.questionCount, 0) : '–'}
-          note="across all exams"
-          icon="book"
-        />
+        <StatCard label="Drafts" value={count('draft')} note="not published yet" icon="draft" />
       </div>
       <div className="two-col">
         <section className="card">
