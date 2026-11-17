@@ -3,13 +3,13 @@ import { Prisma, PrismaClient } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import {
   ACCOUNTS,
-  PRICING,
   assertBalanced,
   type BalancesDto,
   type EarningsExamRow,
   type LedgerCheckDto,
   type LedgerLine,
 } from '@assessiq/shared';
+import { SettingsService } from '../settings/settings.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 type Db = PrismaClient | Prisma.TransactionClient;
@@ -20,7 +20,10 @@ type Db = PrismaClient | Prisma.TransactionClient;
  */
 @Injectable()
 export class LedgerService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly settings: SettingsService,
+  ) {}
 
   /** Writes one balanced transaction. Call inside the same DB transaction as the event itself. */
   async post(
@@ -89,7 +92,7 @@ export class LedgerService {
       pendingPaise: pending,
       paidPaise: paid,
       owedBackPaise: Math.max(0, -net),
-      minPayoutPaise: PRICING.MIN_PAYOUT_PAISE,
+      minPayoutPaise: (await this.settings.get()).minPayoutPaise,
     };
   }
 

@@ -1,10 +1,11 @@
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { PRICING, type SeatDto, type SeatPreviewDto, type SeatsDto } from '@assessiq/shared';
+import { type SeatDto, type SeatPreviewDto, type SeatsDto } from '@assessiq/shared';
 import { AuditService } from '../audit/audit.service';
 import type { AuthUser } from '../common/decorators';
 import { ENV, Env } from '../config/env';
 import { MailService } from '../mail/mail.service';
+import { SettingsService } from '../settings/settings.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 const UUID = /^[0-9a-f-]{36}$/i;
@@ -16,6 +17,7 @@ export class SeatsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly mail: MailService,
+    private readonly settings: SettingsService,
     @Inject(ENV) private readonly env: Env,
   ) {}
 
@@ -56,7 +58,7 @@ export class SeatsService {
       examId: exam.id,
       bought: seats.length,
       redeemed: dto.filter((s) => s.status === 'REDEEMED').length,
-      priceEachPaise: PRICING.EXAM_JOIN_PAISE,
+      priceEachPaise: (await this.settings.get()).examJoinPaise,
       seats: dto,
     };
   }

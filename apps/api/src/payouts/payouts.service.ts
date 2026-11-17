@@ -2,7 +2,6 @@ import { ConflictException, Inject, Injectable, NotFoundException } from '@nestj
 import { ExaminerProfile, Payout, Prisma } from '@prisma/client';
 import {
   ACCOUNTS,
-  PRICING,
   maskAccount,
   payoutLines,
   type AdminPayableRow,
@@ -20,6 +19,7 @@ import { decryptText, encryptText } from '../common/crypto';
 import { ENV, Env } from '../config/env';
 import { LedgerService } from '../ledger/ledger.service';
 import { MailService } from '../mail/mail.service';
+import { SettingsService } from '../settings/settings.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 const UUID = /^[0-9a-f-]{36}$/i;
@@ -46,6 +46,7 @@ export class PayoutsService {
     private readonly ledger: LedgerService,
     private readonly audit: AuditService,
     private readonly mail: MailService,
+    private readonly settings: SettingsService,
     @Inject(ENV) env: Env,
   ) {
     this.secret = env.DATA_ENCRYPTION_KEY ?? env.OTP_SECRET;
@@ -155,9 +156,9 @@ export class PayoutsService {
       });
       if (open) throw new ConflictException('You already have a payout request waiting');
       const balances = await this.ledger.balances(user.id, tx);
-      if (balances.payablePaise < PRICING.MIN_PAYOUT_PAISE) {
+      if (balances.payablePaise < balances.minPayoutPaise) {
         throw new ConflictException(
-          `Payouts start at INR ${(PRICING.MIN_PAYOUT_PAISE / 100).toFixed(0)} payable. Earnings become payable when an exam's results are published.`,
+          `Payouts start at INR ${(balances.minPayoutPaise / 100).toFixed(0)} payable. Earnings become payable when an exam's results are published.`,
         );
       }
       return tx.payout.create({

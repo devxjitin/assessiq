@@ -154,6 +154,43 @@ Exam creation fee: INR ${rupees} (inclusive of applicable taxes)
     });
   }
 
+  /** "Your results are out": sent once, when the trainer publishes. */
+  sendResultsOut(to: string, name: string, r: { examTitle: string; attemptId: string }) {
+    const url = `${this.env.WEB_ORIGIN.split(',')[0].trim()}/result/?id=${encodeURIComponent(r.attemptId)}`;
+    return this.deliver({
+      to,
+      subject: `Your results are out: ${r.examTitle}`,
+      text: `Hi ${name},\n\nThe results for "${r.examTitle}" are published. See your score and review your answers:\n${url}\n\nA practice set with the same questions is now open for you.\n`,
+      html: layout(
+        'Your results are out',
+        `<p>Hi ${esc(name)}, the results for <strong>${esc(r.examTitle)}</strong> are published.</p><p><a href="${esc(url)}">See your score and review your answers</a></p><p>A practice set with the same questions is now open for you.</p>`,
+      ),
+    });
+  }
+
+  /** One reminder, about a day before an exam the student has joined. */
+  sendExamReminder(
+    to: string,
+    name: string,
+    r: { examTitle: string; startsAt: Date; durationMinutes: number },
+  ) {
+    const url = `${this.env.WEB_ORIGIN.split(',')[0].trim()}/dashboard/`;
+    const when = r.startsAt.toLocaleString('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    });
+    return this.deliver({
+      to,
+      subject: `Reminder: ${r.examTitle} starts soon`,
+      text: `Hi ${name},\n\nYour exam "${r.examTitle}" starts on ${when} (India time). You will have ${r.durationMinutes} minutes.\n\nOpen it from your dashboard: ${url}\n\nUse one device and a stable connection; leaving the exam window counts as a strike.\n`,
+      html: layout(
+        'Your exam starts soon',
+        `<p>Hi ${esc(name)}, your exam <strong>${esc(r.examTitle)}</strong> starts on <strong>${esc(when)}</strong> (India time). You will have ${r.durationMinutes} minutes.</p><p><a href="${esc(url)}">Open your dashboard</a></p><p style="font-size:14px">Use one device and a stable connection; leaving the exam window counts as a strike.</p>`,
+      ),
+    });
+  }
+
   sendPayoutPaid(
     to: string,
     name: string,

@@ -10,6 +10,8 @@ import { ConfigModule } from './config/config.module';
 import { AttemptsModule } from './attempts/attempts.module';
 import { CertificatesModule } from './certificates/certificates.module';
 import { CodeModule } from './code/code.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { SettingsModule } from './settings/settings.module';
 import { PracticeModule } from './practice/practice.module';
 import { ResultsModule } from './results/results.module';
 import { EnrollmentsModule } from './enrollments/enrollments.module';
@@ -38,6 +40,7 @@ import { UsersModule } from './users/users.module';
     }),
     ConfigModule,
     PrismaModule,
+    SettingsModule,
     AuditModule,
     MailModule,
     StorageModule,
@@ -54,6 +57,7 @@ import { UsersModule } from './users/users.module';
     CodeModule,
     CertificatesModule,
     PracticeModule,
+    NotificationsModule,
   ],
   controllers: [HealthController],
   providers: [

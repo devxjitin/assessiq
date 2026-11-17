@@ -32,6 +32,8 @@ const schema = z.object({
   VERIFY_BASE_URL: z.string().url().optional(),
   // 'on' starts the background jobs that make certificate PDFs and email approved ones.
   CERT_JOBS_POLL: z.enum(['on', 'off']).default('on'),
+  // 'on' starts the job that sends exam reminders.
+  NOTIFY_JOBS_POLL: z.enum(['on', 'off']).default('on'),
   // Secret in the URL of the endpoint that receives mail bounce notices from AWS SNS.
   SES_EVENTS_KEY: z.string().min(16).optional(),
   CODE_JUDGE_CONCURRENCY: z.coerce.number().int().min(1).max(32).default(4),

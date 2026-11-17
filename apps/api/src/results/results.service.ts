@@ -17,6 +17,7 @@ import {
 } from '@assessiq/shared';
 import { AuditService } from '../audit/audit.service';
 import type { AuthUser } from '../common/decorators';
+import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CertificatesService } from '../certificates/certificates.service';
 import { GradingService } from './grading.service';
@@ -48,6 +49,7 @@ export class ResultsService {
     private readonly grading: GradingService,
     private readonly audit: AuditService,
     private readonly certificates: CertificatesService,
+    private readonly mail: MailService,
   ) {}
 
   // ---------------------------------------------------------------- trainer
@@ -358,6 +360,7 @@ export class ResultsService {
     } catch (err) {
       console.error('Could not create certificates for exam', exam.id, err);
     }
+    await this.notifyResultsOut(exam.id, exam.title);
     return this.results(user, examId);
   }
 
@@ -542,5 +545,23 @@ export class ResultsService {
         ];
       }),
     };
+  }
+
+  /** Tells each student their results are out. A mail problem never undoes the publication. */
+  private async notifyResultsOut(examId: string, title: string): Promise<void> {
+    try {
+      const attempts = await this.prisma.attempt.findMany({
+        where: { examId, status: 'RESULT_PUBLISHED' },
+        include: { student: { select: { email: true, name: true } } },
+      });
+      for (const a of attempts) {
+        await this.mail.sendResultsOut(a.student.email, a.student.name, {
+          examTitle: title,
+          attemptId: a.id,
+        });
+      }
+    } catch (err) {
+      console.error('Could not send results emails for exam', examId, err);
+    }
   }
 }

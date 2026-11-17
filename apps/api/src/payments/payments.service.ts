@@ -26,6 +26,7 @@ import { AuditService } from '../audit/audit.service';
 import type { AuthUser } from '../common/decorators';
 import { LedgerService } from '../ledger/ledger.service';
 import { MailService } from '../mail/mail.service';
+import { SettingsService } from '../settings/settings.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { outstandingSeats, seatToken } from '../seats/capacity';
 import { FakePaymentProvider, PAYMENT_PROVIDER, PaymentProvider } from './provider';
@@ -50,6 +51,7 @@ export class PaymentsService {
     private readonly audit: AuditService,
     private readonly mail: MailService,
     private readonly ledger: LedgerService,
+    private readonly settings: SettingsService,
     @Inject(PAYMENT_PROVIDER) private readonly provider: PaymentProvider,
   ) {
     if (provider.name === 'fake') {
@@ -94,14 +96,22 @@ export class PaymentsService {
       });
     }
 
+    const fees = await this.settings.get();
+    // An unpaid order made at an old price is not reused.
     const existing = await this.prisma.payment.findFirst({
-      where: { examId, purpose: 'EXAM_CREATION', status: 'CREATED', provider: this.provider.name },
+      where: {
+        examId,
+        purpose: 'EXAM_CREATION',
+        status: 'CREATED',
+        provider: this.provider.name,
+        amountPaise: fees.examCreationPaise,
+      },
       orderBy: { createdAt: 'desc' },
     });
     let orderId = existing?.providerOrderId;
     if (!orderId) {
       const order = await this.provider.createOrder({
-        amountPaise: PRICING.EXAM_CREATION_PAISE,
+        amountPaise: fees.examCreationPaise,
         currency: PRICING.CURRENCY,
         receipt: `exam_${exam.id.slice(0, 8)}_${Date.now().toString(36)}`,
       });
@@ -111,7 +121,7 @@ export class PaymentsService {
           userId: user.id,
           examId,
           purpose: 'EXAM_CREATION',
-          amountPaise: PRICING.EXAM_CREATION_PAISE,
+          amountPaise: fees.examCreationPaise,
           currency: PRICING.CURRENCY,
           provider: this.provider.name,
           providerOrderId: orderId,
@@ -127,7 +137,7 @@ export class PaymentsService {
     return {
       provider: this.provider.name,
       orderId,
-      amountPaise: PRICING.EXAM_CREATION_PAISE,
+      amountPaise: fees.examCreationPaise,
       currency: PRICING.CURRENCY,
       keyId: this.provider.publicKeyId,
       description: `Publish exam: ${exam.title}`.slice(0, 250),
@@ -273,7 +283,12 @@ export class PaymentsService {
         const result = await this.enroll(tx, payment);
         const lines =
           result.enrollment && result.exam
-            ? joinFeeLines(payment.amountPaise, result.exam.examinerId, result.exam.id)
+            ? joinFeeLines(
+                payment.amountPaise,
+                result.exam.examinerId,
+                result.exam.id,
+                (await this.settings.get()).examinerSharePercent,
+              )
             : platformFeeLines(payment.amountPaise, payment.examId, 'NO_SEAT_REFUND_DUE');
         await this.ledger.post(tx, lines, { type: 'CREDIT', paymentId: payment.id });
         return result;
@@ -376,6 +391,7 @@ export class PaymentsService {
     if (state === 'ENDED') throw new ConflictException('This exam has ended');
     if (state === 'FULL') throw new ConflictException('This exam is full');
 
+    const fees = await this.settings.get();
     const existing = await this.prisma.payment.findFirst({
       where: {
         examId: exam.id,
@@ -383,13 +399,14 @@ export class PaymentsService {
         purpose: 'EXAM_JOIN',
         status: 'CREATED',
         provider: this.provider.name,
+        amountPaise: fees.examJoinPaise,
       },
       orderBy: { createdAt: 'desc' },
     });
     let orderId = existing?.providerOrderId;
     if (!orderId) {
       const order = await this.provider.createOrder({
-        amountPaise: PRICING.EXAM_JOIN_PAISE,
+        amountPaise: fees.examJoinPaise,
         currency: PRICING.CURRENCY,
         receipt: `join_${exam.id.slice(0, 8)}_${Date.now().toString(36)}`,
       });
@@ -399,7 +416,7 @@ export class PaymentsService {
           userId: user.id,
           examId: exam.id,
           purpose: 'EXAM_JOIN',
-          amountPaise: PRICING.EXAM_JOIN_PAISE,
+          amountPaise: fees.examJoinPaise,
           currency: PRICING.CURRENCY,
           provider: this.provider.name,
           providerOrderId: orderId,
@@ -415,7 +432,7 @@ export class PaymentsService {
     return {
       provider: this.provider.name,
       orderId,
-      amountPaise: PRICING.EXAM_JOIN_PAISE,
+      amountPaise: fees.examJoinPaise,
       currency: PRICING.CURRENCY,
       keyId: this.provider.publicKeyId,
       description: `Join exam: ${exam.title}`.slice(0, 250),
@@ -449,7 +466,8 @@ export class PaymentsService {
       throw new ConflictException(`Only ${Math.max(0, free)} seat(s) are left in this exam`);
     }
 
-    const amountPaise = PRICING.EXAM_JOIN_PAISE * seats;
+    const fees = await this.settings.get();
+    const amountPaise = fees.examJoinPaise * seats;
     const order = await this.provider.createOrder({
       amountPaise,
       currency: PRICING.CURRENCY,

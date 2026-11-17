@@ -290,6 +290,8 @@ model Enrollment {
   paymentId String?  @unique @db.Uuid
   // Set when a sponsored seat paid for this enrollment instead of the student.
   seatId    String?  @unique @db.Uuid
+  // Set when the "your exam starts soon" email went out, so it is only sent once.
+  reminderSentAt DateTime?
   createdAt DateTime @default(now())
 
   exam    Exam     @relation(fields: [examId], references: [id], onDelete: Restrict)
@@ -595,4 +597,13 @@ model PracticeRound {
   exam    Exam @relation(fields: [examId], references: [id], onDelete: Cascade)
 
   @@index([studentId, examId, createdAt])
+}
+
+// Prices, the trainer's share and other values NandiVex can change without a release.
+// One row per key; the value is JSON. Past payments keep the amounts they were charged.
+model PlatformSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+  updatedBy String?  @db.Uuid
 }

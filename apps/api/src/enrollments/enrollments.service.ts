@@ -1,7 +1,8 @@
 import { HttpException, HttpStatus, Injectable, NotFoundException } from '@nestjs/common';
-import { INTEGRITY, PRICING, type EnrollmentDto, type JoinInfoDto } from '@assessiq/shared';
+import { INTEGRITY, type EnrollmentDto, type JoinInfoDto } from '@assessiq/shared';
 import { AuditService } from '../audit/audit.service';
 import type { AuthUser } from '../common/decorators';
+import { SettingsService } from '../settings/settings.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { outstandingSeats } from '../seats/capacity';
 import { computeJoinState, normalizeCode } from './join-state';
@@ -11,6 +12,7 @@ export class EnrollmentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly settings: SettingsService,
   ) {}
 
   /** What a student sees after typing a code, before paying. */
@@ -60,7 +62,7 @@ export class EnrollmentsService {
       endsAt: exam.endsAt?.toISOString() ?? null,
       questionCount: shown,
       totalMarks: Math.round((total / Math.max(1, exam.questions.length)) * shown * 100) / 100,
-      feePaise: PRICING.EXAM_JOIN_PAISE,
+      feePaise: (await this.settings.get()).examJoinPaise,
       state: computeJoinState({
         startsAt: exam.startsAt,
         endsAt: exam.endsAt,

@@ -81,6 +81,7 @@ function navFor(role: string): NavItem[] {
   }
   return [
     home,
+    { href: '/admin/', label: 'Console', icon: 'exams' },
     { href: '/admin/payouts/', label: 'Payouts', icon: 'check' },
     { href: '/admin/payments/', label: 'Payments', icon: 'shield' },
     { href: '/admin/certificates/', label: 'Certificates', icon: 'edit' },
@@ -90,6 +91,7 @@ function navFor(role: string): NavItem[] {
 
 const CRUMBS: Record<string, string> = {
   dashboard: 'Home',
+  practice: 'Practice',
   exams: 'My exams',
   new: 'New exam',
   edit: 'Edit exam',
