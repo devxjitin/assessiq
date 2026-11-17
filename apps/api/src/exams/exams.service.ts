@@ -87,7 +87,16 @@ export class ExamsService {
       orderBy: { createdAt: 'desc' },
       include: { questions: { select: { marks: true } } },
     });
-    return exams.map((e) => this.toSummary(e, e.questions));
+    const joined = await this.prisma.enrollment.groupBy({
+      by: ['examId'],
+      where: { exam: { examinerId: user.id } },
+      _count: { _all: true },
+    });
+    const joinedOf = new Map(joined.map((j) => [j.examId, j._count._all]));
+    return exams.map((e) => ({
+      ...this.toSummary(e, e.questions),
+      joinedCount: joinedOf.get(e.id) ?? 0,
+    }));
   }
 
   async get(user: AuthUser, examId: string): Promise<ExamDetailDto> {

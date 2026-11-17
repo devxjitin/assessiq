@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { TestContext, createAdmin, createTestApp, signUp } from '../../test/helpers';
+import { LedgerService } from '../ledger/ledger.service';
 import { PublishedExam, auth, joinExam, newStudent, publishExam } from '../../test/scenario';
 
 type Token = { accessToken: string };
@@ -28,7 +29,29 @@ beforeEach(async () => {
 const get = (who: Token, url: string) => ctx.http().get(url).set(auth(who));
 const post = (who: Token, url: string, body: object = {}) =>
   ctx.http().post(url).set(auth(who)).send(body);
-const earnings = async () => (await get(trainer, '/earnings').expect(200)).body;
+const earnings = async () => ({
+  balances: await ctx.app.get(LedgerService).balances(trainerId),
+});
+/** The company records where it pays the trainer (trainers no longer enter this themselves). */
+const setDetails = () =>
+  ctx.prisma.examinerProfile.upsert({
+    where: { userId: trainerId },
+    create: { userId: trainerId, payoutMethod: 'UPI', upiId: 'trainer@okbank' },
+    update: { payoutMethod: 'UPI', upiId: 'trainer@okbank' },
+  });
+/** Pays everything that is payable, the way the company does it now. */
+const payAllRaw = (utr: string) =>
+  post(admin, '/admin/finance/payouts', { examinerId: trainerId, amountPaise: 52_150, utr });
+const payAll = async (utr = 'UTR123456') => {
+  const { payablePaise } = (await earnings()).balances;
+  return (
+    await post(admin, '/admin/finance/payouts', {
+      examinerId: trainerId,
+      amountPaise: payablePaise,
+      utr,
+    }).expect(200)
+  ).body;
+};
 const ledger = async () => (await get(admin, '/admin/finance/ledger').expect(200)).body;
 
 /** n students pay the join fee. Returns their tokens. */
@@ -45,14 +68,6 @@ async function students(n: number, prefix = 'stu') {
 /** The exam's results are published: the trainer's share becomes payable. */
 const publishResults = () =>
   ctx.prisma.exam.update({ where: { id: exam.examId }, data: { status: 'RESULTS_FINAL' } });
-
-const UPI = { method: 'UPI', upiId: 'trainer@okbank' };
-const BANK = {
-  method: 'BANK',
-  accountName: 'Asha Rao',
-  accountNumber: '123456789012',
-  ifsc: 'hdfc0001234',
-};
 
 describe('ledger', () => {
   it('books the creation fee and splits each join fee 50/50, always balancing to zero', async () => {
@@ -72,8 +87,6 @@ describe('ledger', () => {
     const e = await earnings();
     expect(e.balances.accruedPaise).toBe(7_450);
     expect(e.balances.payablePaise).toBe(0);
-    expect(e.exams[0]).toMatchObject({ joins: 1, grossPaise: 14_900, sharePaise: 7_450 });
-    expect(e.exams[0].state).toBe('ACCRUED');
   });
 
   it('is only for admins', async () => {
@@ -87,7 +100,6 @@ describe('ledger', () => {
     const e = await earnings();
     expect(e.balances.accruedPaise).toBe(0);
     expect(e.balances.payablePaise).toBe(14_900);
-    expect(e.exams[0].state).toBe('PAYABLE');
   });
 
   it('never accepts an unbalanced entry', async () => {
@@ -106,108 +118,45 @@ describe('ledger', () => {
   });
 });
 
-describe('payout details', () => {
-  it('validates, encrypts the account number and only ever shows the last four digits', async () => {
-    await get(trainer, '/earnings').expect(200);
-    await ctx
-      .http()
-      .put('/earnings/payout-details')
-      .set(auth(trainer))
-      .send({ method: 'UPI', upiId: 'nope' })
-      .expect(400);
-    await ctx
-      .http()
-      .put('/earnings/payout-details')
-      .set(auth(trainer))
-      .send({ ...BANK, accountNumber: '12ab' })
-      .expect(400);
-    await ctx
-      .http()
-      .put('/earnings/payout-details')
-      .set(auth(trainer))
-      .send({ ...BANK, ifsc: 'BAD' })
-      .expect(400);
-    await ctx.http().put('/earnings/payout-details').set(auth(trainer)).send(BANK).expect(200);
-
-    const stored = await ctx.prisma.examinerProfile.findUniqueOrThrow({
-      where: { userId: trainerId },
-    });
-    expect(stored.bankAccountNoEnc).toBeTruthy();
-    expect(stored.bankAccountNoEnc).not.toContain('123456789012');
-    expect(stored.bankAccountLast4).toBe('9012');
-    expect(stored.ifsc).toBe('HDFC0001234');
-
-    const d = (await earnings()).details;
-    expect(d.accountMasked).toBe('****9012');
-    expect(JSON.stringify(d)).not.toContain('123456789012');
-
-    // switching to UPI clears the bank details
-    await ctx.http().put('/earnings/payout-details').set(auth(trainer)).send(UPI).expect(200);
-    const after = await ctx.prisma.examinerProfile.findUniqueOrThrow({
-      where: { userId: trainerId },
-    });
-    expect(after.bankAccountNoEnc).toBeNull();
-    expect(after.upiId).toBe('trainer@okbank');
-  });
-
-  it('is for trainers only', async () => {
-    const s = await newStudent(ctx, 'sam@example.com');
-    await get(s, '/earnings').expect(403);
-    await ctx.http().put('/earnings/payout-details').set(auth(s)).send(UPI).expect(403);
-  });
-});
-
 describe('payouts', () => {
   async function readyToPay(count = 7) {
     await students(count);
     await publishResults();
-    await ctx.http().put('/earnings/payout-details').set(auth(trainer)).send(BANK).expect(200);
+    await setDetails();
   }
 
-  it('needs payout details and the minimum before a request', async () => {
-    await students(1);
-    await publishResults();
-    await post(trainer, '/payouts/request').expect(409); // no details
-    await ctx.http().put('/earnings/payout-details').set(auth(trainer)).send(UPI).expect(200);
-    const res = await post(trainer, '/payouts/request').expect(409); // 74.50 is below 500
-    expect(res.body.message).toContain('500');
+  it('trainers have no earnings or payout routes any more', async () => {
+    await get(trainer, '/earnings').expect(404);
+    await ctx.http().put('/earnings/payout-details').set(auth(trainer)).send({}).expect(404);
+    await post(trainer, '/payouts/request').expect(404);
   });
 
-  it('requests, pays with a UTR, books the ledger and sends the trainer a statement', async () => {
+  it('is paid by the company with a UTR, books the ledger and emails the trainer', async () => {
     await readyToPay(7); // 7 x 74.50 = 521.50
-    const req = (await post(trainer, '/payouts/request').expect(200)).body;
-    expect(req.amountPaise).toBe(52_150);
-    expect(req.status).toBe('REQUESTED');
-    expect(req.destination).toContain('****9012');
-    expect(req.destination).not.toContain('123456789012');
-    await post(trainer, '/payouts/request').expect(409); // one at a time
-
-    let e = await earnings();
-    expect(e.balances.pendingPaise).toBe(52_150);
-    expect(e.balances.payablePaise).toBe(0);
-
-    // the admin sees the full details to pay with
     const rows = (await get(admin, '/admin/finance/payable').expect(200)).body;
     expect(rows).toHaveLength(1);
-    expect(rows[0].request.id).toBe(req.id);
-    expect(rows[0].destination).toContain('123456789012');
-    expect(rows[0].detailsVerified).toBe(false);
-    await post(admin, `/admin/finance/examiners/${trainerId}/verify-details`).expect(200);
+    expect(rows[0].balances.payablePaise).toBe(52_150);
+    expect(rows[0].destination).toBe('trainer@okbank');
 
-    await post(trainer, `/admin/finance/payouts/${req.id}/pay`, { utr: 'UTR123456' }).expect(403);
-    await post(admin, `/admin/finance/payouts/${req.id}/pay`, { utr: '12' }).expect(400);
+    await post(trainer, '/admin/finance/payouts', {
+      examinerId: trainerId,
+      amountPaise: 52_150,
+      utr: 'UTR123456',
+    }).expect(403);
+    await post(admin, '/admin/finance/payouts', {
+      examinerId: trainerId,
+      amountPaise: 52_150,
+      utr: '12',
+    }).expect(400);
     ctx.mail.clear();
-    const paid = (
-      await post(admin, `/admin/finance/payouts/${req.id}/pay`, { utr: 'UTR123456' }).expect(200)
-    ).body;
+    const paid = await payAll();
     expect(paid.status).toBe('PAID');
     expect(paid.utr).toBe('UTR123456');
-    await post(admin, `/admin/finance/payouts/${req.id}/pay`, { utr: 'UTR123456' }).expect(409);
+    expect(paid.amountPaise).toBe(52_150);
 
-    e = await earnings();
+    const e = await earnings();
     expect(e.balances.paidPaise).toBe(52_150);
     expect(e.balances.payablePaise).toBe(0);
-    expect(e.balances.pendingPaise).toBe(0);
     const l = await ledger();
     expect(l.paidOutPaise).toBe(52_150);
     expect(l.owedToTrainersPaise).toBe(0);
@@ -217,32 +166,14 @@ describe('payouts', () => {
     expect(mail?.subject).toContain('521.50');
     expect(mail?.text).toContain('UTR123456');
 
-    const csv = (await get(trainer, `/payouts/${req.id}/statement.csv`).expect(200)).text;
+    const csv = (await get(admin, `/payouts/${paid.id}/statement.csv`).expect(200)).text;
     expect(csv).toContain('UTR123456');
     expect(csv).toContain('521.50');
     expect(csv).toContain('Student fee share');
-    expect(csv).not.toContain('123456789012');
-    const other = await signUp(ctx, { role: 'EXAMINER', email: 'other@example.com' });
-    await get(other, `/payouts/${req.id}/statement.csv`).expect(404);
-    await get(admin, `/payouts/${req.id}/statement.csv`).expect(200);
+    await get(trainer, `/payouts/${paid.id}/statement.csv`).expect(403);
   });
 
-  it('can be rejected, after which the trainer can ask again', async () => {
-    await readyToPay();
-    const req = (await post(trainer, '/payouts/request').expect(200)).body;
-    await post(admin, `/admin/finance/payouts/${req.id}/reject`, { note: 'x' }).expect(400);
-    await post(admin, `/admin/finance/payouts/${req.id}/reject`, {
-      note: 'Details look wrong',
-    }).expect(200);
-    await post(admin, `/admin/finance/payouts/${req.id}/pay`, { utr: 'UTR123456' }).expect(409);
-    expect((await earnings()).balances.payablePaise).toBe(52_150);
-    await post(trainer, '/payouts/request').expect(200);
-    const history = (await get(admin, '/admin/finance/payouts?status=REJECTED').expect(200)).body;
-    expect(history).toHaveLength(1);
-    expect(history[0].examinerEmail).toBe('trainer@example.com');
-  });
-
-  it('lets an admin pay without a request, but never more than is payable', async () => {
+  it('never pays more than is payable', async () => {
     await readyToPay();
     await post(admin, '/admin/finance/payouts', {
       examinerId: trainerId,
@@ -255,21 +186,13 @@ describe('payouts', () => {
       utr: 'UTR777777',
     }).expect(200);
     expect((await earnings()).balances.payablePaise).toBe(50_150);
-
-    const req = (await post(trainer, '/payouts/request').expect(200)).body;
-    await post(admin, '/admin/finance/payouts', {
-      examinerId: trainerId,
-      amountPaise: 1_000,
-      utr: 'UTR888888',
-    }).expect(409); // an open request must be settled first
-    await post(admin, `/admin/finance/payouts/${req.id}/pay`, { utr: 'UTR999999' }).expect(200);
+    await payAll('UTR999999');
     expect((await ledger()).totalPaise).toBe(0);
     expect((await earnings()).balances.paidPaise).toBe(52_150);
   });
 
   it('cannot pay money that is not payable yet', async () => {
     await students(7);
-    await ctx.http().put('/earnings/payout-details').set(auth(trainer)).send(UPI).expect(200);
     await post(admin, '/admin/finance/payouts', {
       examinerId: trainerId,
       amountPaise: 10_000,
@@ -277,13 +200,16 @@ describe('payouts', () => {
     }).expect(409); // exam results are not published
   });
 
-  it('two admins paying the same request pay it once', async () => {
+  it('works even if no payout details are saved (the company pays outside the app)', async () => {
+    await students(7);
+    await publishResults();
+    const paid = await payAll();
+    expect(paid.status).toBe('PAID');
+  });
+
+  it('two simultaneous payouts of the same money pay it once', async () => {
     await readyToPay();
-    const req = (await post(trainer, '/payouts/request').expect(200)).body;
-    const results = await Promise.all([
-      post(admin, `/admin/finance/payouts/${req.id}/pay`, { utr: 'UTR111111' }),
-      post(admin, `/admin/finance/payouts/${req.id}/pay`, { utr: 'UTR222222' }),
-    ]);
+    const results = await Promise.all([payAllRaw('UTR111111'), payAllRaw('UTR222222')]);
     expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
     expect((await ledger()).paidOutPaise).toBe(52_150);
   });
@@ -323,7 +249,7 @@ describe('refunds', () => {
 
     const e = await earnings();
     expect(e.balances.accruedPaise).toBe(7_450);
-    expect(e.exams[0].joins).toBe(1);
+    expect(await ctx.prisma.enrollment.count({ where: { examId: exam.examId } })).toBe(1);
     const l = await ledger();
     expect(l.totalPaise).toBe(0);
     expect(l.unbalancedTransactions).toEqual([]);
@@ -358,9 +284,8 @@ describe('refunds', () => {
     const first = await joinPayment('s0@example.com');
     for (let i = 1; i < 7; i++) await joinPayment(`s${i}@example.com`);
     await publishResults();
-    await ctx.http().put('/earnings/payout-details').set(auth(trainer)).send(UPI).expect(200);
-    const req = (await post(trainer, '/payouts/request').expect(200)).body;
-    await post(admin, `/admin/finance/payouts/${req.id}/pay`, { utr: 'UTR123456' }).expect(200);
+    await setDetails();
+    await payAll();
 
     await refund(first.payment.id).expect(200);
     let b = (await earnings()).balances;

@@ -6,16 +6,13 @@ import {
   payoutLines,
   type AdminPayableRow,
   type DirectPayoutInput,
-  type EarningsDto,
   type PayPayoutInput,
-  type PayoutDetailsDto,
-  type PayoutDetailsInput,
   type PayoutDto,
   type RejectPayoutInput,
 } from '@assessiq/shared';
 import { AuditService } from '../audit/audit.service';
 import type { AuthUser } from '../common/decorators';
-import { decryptText, encryptText } from '../common/crypto';
+import { decryptText } from '../common/crypto';
 import { ENV, Env } from '../config/env';
 import { LedgerService } from '../ledger/ledger.service';
 import { MailService } from '../mail/mail.service';
@@ -36,7 +33,7 @@ const toDto = (p: Payout): PayoutDto => ({
   paidAt: p.paidAt?.toISOString() ?? null,
 });
 
-/** Trainer earnings and the manual payout workflow. NandiVex pays by UPI/bank, then records the UTR. */
+/** The manual payout workflow (admin only). NandiVex pays by UPI/bank, then records the UTR. */
 @Injectable()
 export class PayoutsService {
   private readonly secret: string;
@@ -53,17 +50,6 @@ export class PayoutsService {
   }
 
   // ------------------------------------------------------------ payout details
-
-  private detailsDto(p: ExaminerProfile | null): PayoutDetailsDto {
-    return {
-      method: p?.payoutMethod ?? null,
-      upiId: p?.upiId ?? null,
-      accountName: p?.bankAccountName ?? null,
-      accountMasked: maskAccount(p?.bankAccountLast4 ?? null),
-      ifsc: p?.ifsc ?? null,
-      verifiedAt: p?.payoutDetailsVerifiedAt?.toISOString() ?? null,
-    };
-  }
 
   /** What a payout record keeps: enough to see where it went, never the full account number. */
   private snapshot(p: ExaminerProfile): string | null {
@@ -86,98 +72,6 @@ export class PayoutsService {
       return `${p.bankAccountName} · account number unreadable (ask the trainer to re-enter it)`;
     }
     return `${p.bankAccountName} · A/c ${number} · IFSC ${p.ifsc}`;
-  }
-
-  async saveDetails(user: AuthUser, input: PayoutDetailsInput): Promise<PayoutDetailsDto> {
-    const data: Prisma.ExaminerProfileUncheckedUpdateInput =
-      input.method === 'UPI'
-        ? {
-            payoutMethod: 'UPI',
-            upiId: input.upiId,
-            bankAccountName: null,
-            bankAccountNoEnc: null,
-            bankAccountLast4: null,
-            ifsc: null,
-          }
-        : {
-            payoutMethod: 'BANK',
-            upiId: null,
-            bankAccountName: input.accountName,
-            bankAccountNoEnc: encryptText(input.accountNumber, this.secret),
-            bankAccountLast4: input.accountNumber.slice(-4),
-            ifsc: input.ifsc,
-          };
-    const profile = await this.prisma.examinerProfile.upsert({
-      where: { userId: user.id },
-      create: {
-        ...(data as Prisma.ExaminerProfileUncheckedCreateInput),
-        userId: user.id,
-        payoutDetailsUpdatedAt: new Date(),
-      },
-      // Changed details must be checked again before the next payout.
-      update: { ...data, payoutDetailsUpdatedAt: new Date(), payoutDetailsVerifiedAt: null },
-    });
-    await this.audit.log({
-      actorId: user.id,
-      action: 'payout.details.update',
-      entity: 'User',
-      entityId: user.id,
-      meta: { method: input.method },
-    });
-    return this.detailsDto(profile);
-  }
-
-  // ------------------------------------------------------------------ trainer
-
-  async earnings(user: AuthUser): Promise<EarningsDto> {
-    const [balances, exams, payouts, profile] = await Promise.all([
-      this.ledger.balances(user.id),
-      this.ledger.earningsByExam(user.id),
-      this.prisma.payout.findMany({
-        where: { examinerId: user.id },
-        orderBy: { requestedAt: 'desc' },
-        take: 50,
-      }),
-      this.prisma.examinerProfile.findUnique({ where: { userId: user.id } }),
-    ]);
-    return { balances, exams, payouts: payouts.map(toDto), details: this.detailsDto(profile) };
-  }
-
-  /** "Request payout": asks NandiVex to pay everything that is payable now. */
-  async request(user: AuthUser): Promise<PayoutDto> {
-    const profile = await this.prisma.examinerProfile.findUnique({ where: { userId: user.id } });
-    if (!profile?.payoutMethod) {
-      throw new ConflictException('Add your UPI id or bank account before asking for a payout');
-    }
-    const created = await this.prisma.$transaction(async (tx) => {
-      await this.lock(tx, user.id);
-      const open = await tx.payout.findFirst({
-        where: { examinerId: user.id, status: 'REQUESTED' },
-      });
-      if (open) throw new ConflictException('You already have a payout request waiting');
-      const balances = await this.ledger.balances(user.id, tx);
-      if (balances.payablePaise < balances.minPayoutPaise) {
-        throw new ConflictException(
-          `Payouts start at INR ${(balances.minPayoutPaise / 100).toFixed(0)} payable. Earnings become payable when an exam's results are published.`,
-        );
-      }
-      return tx.payout.create({
-        data: {
-          examinerId: user.id,
-          amountPaise: balances.payablePaise,
-          method: profile.payoutMethod,
-          destination: this.snapshot(profile),
-        },
-      });
-    });
-    await this.audit.log({
-      actorId: user.id,
-      action: 'payout.request',
-      entity: 'Payout',
-      entityId: created.id,
-      meta: { amountPaise: created.amountPaise },
-    });
-    return toDto(created);
   }
 
   async statement(user: AuthUser, payoutId: string): Promise<{ filename: string; body: string }> {
@@ -387,9 +281,6 @@ export class PayoutsService {
     input: { utr: string; note?: string | null },
   ): Promise<Payout> {
     const profile = await tx.examinerProfile.findUnique({ where: { userId: payout.examinerId } });
-    if (!profile?.payoutMethod) {
-      throw new ConflictException('This trainer has no payout details on file');
-    }
     // The amount must still be covered by released money, after the other open requests.
     const balances = await this.ledger.balances(payout.examinerId, tx);
     const otherPending =
@@ -412,8 +303,8 @@ export class PayoutsService {
         status: 'PAID',
         utr: input.utr,
         note: input.note ?? payout.note,
-        method: profile.payoutMethod,
-        destination: this.snapshot(profile),
+        method: profile?.payoutMethod ?? null,
+        destination: profile ? this.snapshot(profile) : null,
         paidAt: now,
         paidById: admin.id,
         periodFrom: lastPaid?.paidAt ?? null,

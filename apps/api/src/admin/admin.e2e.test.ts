@@ -103,12 +103,6 @@ describe('monthly report: how much did we earn and owe', () => {
       .expect(200);
 
     // the trainer asks for a payout and NandiVex pays it
-    await ctx
-      .http()
-      .put('/earnings/payout-details')
-      .set(auth(trainer))
-      .send({ method: 'UPI', upiId: 'trainer@okbank' })
-      .expect(200);
     // 3 students x 74.50 = 223.50, below the 500 minimum, so an admin pays a direct payout
     const trainerRow = await ctx.prisma.user.findUniqueOrThrow({
       where: { email: 'trainer@example.com' },
@@ -314,15 +308,12 @@ describe('platform settings', () => {
     // 100 in the minimum is now 50.00, so a trainer with 74.50 payable may ask for a payout
     await students(1);
     await ctx.prisma.exam.update({ where: { id: exam.examId }, data: { status: 'RESULTS_FINAL' } });
-    await ctx
-      .http()
-      .put('/earnings/payout-details')
-      .set(auth(trainer))
-      .send({ method: 'UPI', upiId: 'trainer@okbank' })
-      .expect(200);
-    const e = (await get(trainer, '/earnings').expect(200)).body;
-    expect(e.balances.minPayoutPaise).toBe(5_000);
-    await ctx.http().post('/payouts/request').set(auth(trainer)).expect(200);
+    const { LedgerService } = await import('../ledger/ledger.service');
+    const trainerId = (
+      await ctx.prisma.user.findUniqueOrThrow({ where: { email: 'trainer@example.com' } })
+    ).id;
+    const e = await ctx.app.get(LedgerService).balances(trainerId);
+    expect(e.minPayoutPaise).toBe(5_000);
   });
 
   it('does not reuse an unpaid order made at the old price', async () => {

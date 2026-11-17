@@ -75,7 +75,6 @@ function navFor(role: string): NavItem[] {
     return [
       home,
       { href: '/exams/', label: 'My exams', icon: 'exams' },
-      { href: '/earnings/', label: 'Earnings', icon: 'zap' },
       profile,
     ];
   }
@@ -100,7 +99,6 @@ const CRUMBS: Record<string, string> = {
   profile: 'Profile',
   grade: 'Grade attempt',
   result: 'Result',
-  earnings: 'Earnings',
   admin: 'Admin',
   payouts: 'Payouts',
   payments: 'Payments',

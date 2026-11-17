@@ -61,6 +61,7 @@ export default function ExamsPage() {
                   <th>Title</th>
                   <th>Status</th>
                   <th>Questions</th>
+                  <th>Students joined</th>
                   <th>Total marks</th>
                   <th>Duration</th>
                   <th />
@@ -74,6 +75,7 @@ export default function ExamsPage() {
                       <StatusBadge status={e.status} />
                     </td>
                     <td>{e.questionCount}</td>
+                    <td>{e.joinedCount ?? 0}</td>
                     <td>{e.totalMarks}</td>
                     <td>{e.durationMinutes} min</td>
                     <td>

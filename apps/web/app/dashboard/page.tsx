@@ -306,6 +306,12 @@ function TrainerHome() {
           highlight
         />
         <StatCard
+          label="Students joined"
+          value={exams ? list.reduce((n, e) => n + (e.joinedCount ?? 0), 0) : '–'}
+          note="across all exams"
+          icon="users"
+        />
+        <StatCard
           label="Published"
           value={exams ? list.filter((e) => e.status !== 'DRAFT').length : '–'}
           note="open for students"
