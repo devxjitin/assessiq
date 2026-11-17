@@ -20,7 +20,7 @@ export interface TestContext {
 
 export async function createTestApp(): Promise<TestContext> {
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
-  const app = moduleRef.createNestApplication();
+  const app = moduleRef.createNestApplication({ rawBody: true });
   configureApp(app);
   await app.init();
 
@@ -34,7 +34,7 @@ export async function createTestApp(): Promise<TestContext> {
     http: () => request(app.getHttpServer()),
     reset: async () => {
       await prisma.$executeRawUnsafe(
-        'TRUNCATE TABLE "AuditLog", "Question", "Exam", "RefreshToken", "EmailOtp", "ExaminerProfile", "User" CASCADE',
+        'TRUNCATE TABLE "AuditLog", "WebhookEvent", "Payment", "Question", "Exam", "RefreshToken", "EmailOtp", "ExaminerProfile", "User" CASCADE',
       );
       mail.clear();
     },

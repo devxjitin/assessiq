@@ -10,6 +10,11 @@ const schema = z.object({
   MAIL_TRANSPORT: z.enum(['ses', 'log', 'memory']).default('log'),
   SES_FROM_EMAIL: z.string().default('no-reply@assessiq.nandivex.in'),
   SES_CONFIGURATION_SET: z.string().optional(),
+  // Payments. 'fake' simulates the gateway (staging/dev only); 'razorpay' talks to the real API.
+  PAYMENT_PROVIDER: z.enum(['fake', 'razorpay']).default('fake'),
+  RAZORPAY_KEY_ID: z.string().optional(),
+  RAZORPAY_KEY_SECRET: z.string().optional(),
+  RAZORPAY_WEBHOOK_SECRET: z.string().optional(),
   AWS_REGION: z.string().default('ap-south-1'),
   // Private file storage (exam logos, later certificates). `memory` is for tests/local dev.
   STORAGE_DRIVER: z.enum(['s3', 'memory']).default('memory'),
@@ -35,6 +40,12 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
     throw new Error(`Invalid environment configuration: ${problems}`);
   }
   const env = parsed.data;
+  if (env.PAYMENT_PROVIDER === 'razorpay') {
+    const missing = ['RAZORPAY_KEY_ID', 'RAZORPAY_KEY_SECRET', 'RAZORPAY_WEBHOOK_SECRET'].filter(
+      (k) => !source[k],
+    );
+    if (missing.length) throw new Error(`PAYMENT_PROVIDER=razorpay needs: ${missing.join(', ')}`);
+  }
   return {
     ...env,
     cookieSecure: env.COOKIE_SECURE ? env.COOKIE_SECURE === 'true' : env.NODE_ENV === 'production',

@@ -4,12 +4,13 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import type { ExamDetailDto, ExamQuestionDto } from '@assessiq/shared';
 import { ExamSettingsForm } from '../../../components/exam-settings-form';
+import { PublishPanel } from '../../../components/publish-panel';
 import { QuestionEditor } from '../../../components/question-editor';
 import { Alert, Button, Shell, describeError, useQueryParam } from '../../../components/ui';
 import { ApiError, api, apiBlob } from '../../../lib/api';
 import { useRequireAuth } from '../../../lib/auth';
 
-type Tab = 'questions' | 'import' | 'settings' | 'logo';
+type Tab = 'questions' | 'import' | 'settings' | 'logo' | 'publish';
 
 const TYPE_LABEL = {
   SINGLE: 'One correct',
@@ -421,6 +422,7 @@ export default function EditExamPage() {
     ['import', 'Import'],
     ['settings', 'Settings'],
     ['logo', 'Logo'],
+    ['publish', locked ? 'Share' : 'Publish'],
   ];
 
   return (
@@ -492,6 +494,9 @@ export default function EditExamPage() {
             />
           ))}
         {tab === 'logo' && <LogoTab exam={exam} reload={reload} locked={locked} />}
+        {tab === 'publish' && (
+          <PublishPanel exam={exam} userName={user.name} userEmail={user.email} reload={reload} />
+        )}
       </section>
     </Shell>
   );

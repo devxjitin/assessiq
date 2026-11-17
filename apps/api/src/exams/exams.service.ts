@@ -449,6 +449,8 @@ export class ExamsService {
       shuffleOptions: exam.shuffleOptions,
       maxStudents: exam.maxStudents,
       hasLogo: Boolean(exam.logoKey),
+      code: exam.code,
+      publishedAt: exam.publishedAt?.toISOString() ?? null,
       questions: exam.questions.map((q) => this.toQuestion(q)),
     };
   }

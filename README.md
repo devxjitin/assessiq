@@ -41,13 +41,21 @@ npm run dev:worker
 
 Still open from Sprint 0: ESLint and commit hooks, design system and wireframes, production Terraform apply, working GitHub Actions (blocked by billing). See the plan file for full status.
 
+## Sprint 3: publishing and payments (done, fake provider)
+
+- **Flow:** the trainer opens the **Publish** tab, pays the creation fee (₹199), and the exam becomes `PUBLISHED` with a share code like `NVX-7K3P9Q` and an emailed receipt. Publishing needs at least one question and an open/close window that is in the future and at least as long as the exam.
+- **API:** `POST /exams/:id/publish-order` (creates or resumes the order), `POST /payments/verify` (checks the gateway signature), `POST /payments/webhook` (gateway to server; signature-checked, safe to redeliver), `POST /payments/fake/complete` (fake provider only).
+- **Safety rules:** the exam is only published by a captured payment; capturing is exactly-once whether the browser or the webhook arrives first; the webhook amount must match; a late "failed" event never downgrades a captured payment; a paid order whose exam was deleted is flagged in the audit log for a manual refund.
+- **Providers:** `PAYMENT_PROVIDER=fake` (default) simulates the gateway and the web app shows a test-mode notice. `PAYMENT_PROVIDER=razorpay` uses the real API and needs `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` and `RAZORPAY_WEBHOOK_SECRET`; the server refuses to start without them. Never run `fake` in production.
+- **Webhook setup (Razorpay dashboard):** URL `https://<api host>/payments/webhook`, events `payment.captured` and `payment.failed`.
+
 ## Sprint 2: exam builder (done)
 
 - **Trainer-only API** (`apps/api/src/exams`): create, edit and delete **draft** exams; single-answer, multiple-answer and subjective questions; reorder; bulk import from pasted text (check first, then import); private logo upload; "preview as student" that never includes answers, explanations or rubrics.
 - **Rules:** a trainer only ever sees their own exams (others return 404); only `DRAFT` exams can be changed; at most 300 questions per exam; negative marks cannot exceed the marks for a correct answer.
 - **Logo:** PNG or JPEG up to 512 KB, type checked from the file contents (SVG is refused). Stored in the private S3 files bucket and served only through the API to the owner. Locally and in tests it uses an in-memory store (`STORAGE_DRIVER=memory`); staging sets `STORAGE_DRIVER=s3`.
 - **Web:** `/exams/` (list), `/exams/new/`, `/exams/edit/?id=…` (questions, import, settings, logo), `/exams/preview/?id=…`.
-- **Not yet:** coding questions (Sprint 6), publishing and the ₹199 payment (Sprint 3).
+- **Not yet:** coding questions (Sprint 6).
 
 ## Sprint 1: identity (done)
 

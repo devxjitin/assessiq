@@ -101,4 +101,32 @@ export class MailService {
       ),
     });
   }
+
+  sendPublishReceipt(
+    to: string,
+    name: string,
+    r: { examTitle: string; code: string; receiptNo: string; amountPaise: number; paidAt: Date },
+  ) {
+    const rupees = (r.amountPaise / 100).toFixed(2);
+    const joinUrl = `${this.env.WEB_ORIGIN.split(',')[0].trim()}/join/?code=${encodeURIComponent(r.code)}`;
+    const date = r.paidAt.toISOString().slice(0, 10);
+    return this.deliver({
+      to,
+      subject: `Receipt ${r.receiptNo}: your exam is published`,
+      text: `Hi ${name},
+
+Your exam "${r.examTitle}" is published.
+
+Exam code: ${r.code}
+Share link: ${joinUrl}
+
+Receipt ${r.receiptNo}, ${date}
+Exam creation fee: INR ${rupees} (inclusive of applicable taxes)
+`,
+      html: layout(
+        'Your exam is published',
+        `<p>Hi ${esc(name)}, your exam <strong>${esc(r.examTitle)}</strong> is published. Share this code with your students:</p>${codeBlock(r.code)}<p>Or send them <a href="${esc(joinUrl)}">${esc(joinUrl)}</a></p><hr style="border:0;border-top:1px solid #ddd;margin:20px 0"><p style="font-size:14px">Receipt <strong>${esc(r.receiptNo)}</strong> · ${date}<br>Exam creation fee: INR ${rupees} (inclusive of applicable taxes)</p>`,
+      ),
+    });
+  }
 }

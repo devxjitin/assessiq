@@ -1,0 +1,31 @@
+import { z } from 'zod';
+
+/** Sent by the browser after the gateway's checkout succeeds. */
+export const verifyPaymentSchema = z.object({
+  orderId: z.string().min(1).max(100),
+  paymentId: z.string().min(1).max(100),
+  signature: z.string().min(1).max(200),
+});
+export type VerifyPaymentInput = z.infer<typeof verifyPaymentSchema>;
+
+export const fakeCompleteSchema = z.object({ orderId: z.string().min(1).max(100) });
+export type FakeCompleteInput = z.infer<typeof fakeCompleteSchema>;
+
+export interface PublishOrderDto {
+  provider: 'fake' | 'razorpay';
+  orderId: string;
+  amountPaise: number;
+  currency: string;
+  /** Razorpay public key id for Checkout (null for the fake provider). */
+  keyId: string | null;
+  description: string;
+}
+
+export interface PublishResultDto {
+  exam: { id: string; status: string; code: string | null };
+  receiptNo: string;
+}
+
+export function formatReceiptNo(n: number): string {
+  return `AIQ-R-${String(n).padStart(6, '0')}`;
+}

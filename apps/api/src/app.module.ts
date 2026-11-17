@@ -7,6 +7,7 @@ import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { RolesGuard } from './auth/roles.guard';
 import { ConfigModule } from './config/config.module';
+import { PaymentsModule } from './payments/payments.module';
 import { ExamsModule } from './exams/exams.module';
 import { HealthController } from './health/health.controller';
 import { StorageModule } from './storage/storage.module';
@@ -36,6 +37,7 @@ import { UsersModule } from './users/users.module';
     UsersModule,
     AdminModule,
     ExamsModule,
+    PaymentsModule,
   ],
   controllers: [HealthController],
   providers: [

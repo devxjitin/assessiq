@@ -3,3 +3,4 @@ export * from './constants';
 export * from './enums';
 export * from './exam';
 export * from './money';
+export * from './payment';

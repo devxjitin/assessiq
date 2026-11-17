@@ -6,7 +6,10 @@ import { configureApp } from './configure-app';
 import { ENV, Env } from './config/env';
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    // Webhook signatures are computed over the exact raw bytes.
+    rawBody: true,
+  });
   // Behind Caddy: trust one proxy hop so req.ip is the real client address.
   app.set('trust proxy', 1);
   configureApp(app);

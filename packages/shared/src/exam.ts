@@ -166,6 +166,9 @@ export interface ExamDetailDto extends ExamSummaryDto {
   shuffleOptions: boolean;
   maxStudents: number;
   hasLogo: boolean;
+  /** Share code; set once the creation fee is paid. */
+  code: string | null;
+  publishedAt: string | null;
   questions: ExamQuestionDto[];
 }
 
