@@ -95,6 +95,12 @@ variable "github_repository" {
   default     = ""
 }
 
+variable "github_immutable_subject" {
+  description = "Optional extra OIDC subject prefix for repos with GitHub's immutable subject on, e.g. \"owner@ID/name@ID\". Allowed in addition to github_repository."
+  type        = string
+  default     = ""
+}
+
 variable "create_github_oidc_provider" {
   description = "The GitHub OIDC provider is account-wide. true in ONE environment (staging), false elsewhere."
   type        = bool

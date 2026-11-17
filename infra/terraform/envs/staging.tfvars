@@ -15,4 +15,5 @@ budget_email          = ""    # <- your email for $20 / $50 / $80 alerts
 
 # GitHub repo ("owner/name") allowed to deploy via OIDC. Fill in once the repository exists.
 github_repository           = "devxjitin/assessiq"
+github_immutable_subject    = "devxjitin@292993567/assessiq@1460239934" # repo has immutable OIDC subject on
 create_github_oidc_provider = false # already exists in this AWS account (shared with other projects)
