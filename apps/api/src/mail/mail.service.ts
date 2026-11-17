@@ -130,6 +130,71 @@ Exam creation fee: INR ${rupees} (inclusive of applicable taxes)
     });
   }
 
+  sendPayoutPaid(
+    to: string,
+    name: string,
+    r: { amountPaise: number; utr: string; destination: string; paidAt: Date },
+  ) {
+    const rupees = (r.amountPaise / 100).toFixed(2);
+    const date = r.paidAt.toISOString().slice(0, 10);
+    return this.deliver({
+      to,
+      subject: `Payout of INR ${rupees} sent`,
+      text: `Hi ${name},\n\nNandiVex has sent your AssessIQ earnings.\n\nAmount: INR ${rupees}\nSent to: ${r.destination}\nReference (UTR): ${r.utr}\nDate: ${date}\n\nYou can download the statement from the Earnings page.\n`,
+      html: layout(
+        'Your payout was sent',
+        `<p>Hi ${esc(name)}, NandiVex has sent your AssessIQ earnings.</p><p style="font-size:14px">Amount: <strong>INR ${rupees}</strong><br>Sent to: ${esc(r.destination)}<br>Reference (UTR): <strong>${esc(r.utr)}</strong><br>Date: ${date}</p><p>You can download the statement from the Earnings page.</p>`,
+      ),
+    });
+  }
+
+  sendRefundNotice(
+    to: string,
+    name: string,
+    r: { amountPaise: number; what: string; reason: string },
+  ) {
+    const rupees = (r.amountPaise / 100).toFixed(2);
+    return this.deliver({
+      to,
+      subject: `Refund of INR ${rupees}`,
+      text: `Hi ${name},\n\nWe have refunded INR ${rupees} for ${r.what}.\nReason: ${r.reason}\nIt reaches your original payment method in a few working days.\n`,
+      html: layout(
+        'Your refund was issued',
+        `<p>Hi ${esc(name)}, we have refunded <strong>INR ${rupees}</strong> for ${esc(r.what)}.</p><p style="font-size:14px">Reason: ${esc(r.reason)}</p><p>It reaches your original payment method in a few working days.</p>`,
+      ),
+    });
+  }
+
+  sendSeatInvite(to: string, r: { examTitle: string; trainerName: string; link: string }) {
+    return this.deliver({
+      to,
+      subject: `${r.trainerName} has paid for your seat in "${r.examTitle}"`,
+      text: `Hello,\n\n${r.trainerName} has reserved and paid for your seat in "${r.examTitle}" on AssessIQ. You do not need to pay.\n\nSign in (or create a student account with this email address) and open:\n${r.link}\n`,
+      html: layout(
+        'Your exam seat is paid for',
+        `<p>${esc(r.trainerName)} has reserved and paid for your seat in <strong>${esc(r.examTitle)}</strong>. You do not need to pay.</p><p>Sign in (or create a student account with this email address) and open:<br><a href="${esc(r.link)}">${esc(r.link)}</a></p>`,
+      ),
+    });
+  }
+
+  sendSeatReceipt(
+    to: string,
+    name: string,
+    r: { examTitle: string; seats: number; receiptNo: string; amountPaise: number; paidAt: Date },
+  ) {
+    const rupees = (r.amountPaise / 100).toFixed(2);
+    const date = r.paidAt.toISOString().slice(0, 10);
+    return this.deliver({
+      to,
+      subject: `Receipt ${r.receiptNo}: ${r.seats} seats for "${r.examTitle}"`,
+      text: `Hi ${name},\n\nYou bought ${r.seats} seat(s) for "${r.examTitle}". Assign them to students from the Seats tab of the exam.\n\nReceipt ${r.receiptNo}, ${date}\nTotal: INR ${rupees} (inclusive of applicable taxes)\n`,
+      html: layout(
+        'Seats purchased',
+        `<p>Hi ${esc(name)}, you bought <strong>${r.seats}</strong> seat(s) for <strong>${esc(r.examTitle)}</strong>. Assign them to students from the Seats tab of the exam.</p><hr style="border:0;border-top:1px solid #ddd;margin:20px 0"><p style="font-size:14px">Receipt <strong>${esc(r.receiptNo)}</strong> · ${date}<br>Total: INR ${rupees} (inclusive of applicable taxes)</p>`,
+      ),
+    });
+  }
+
   sendJoinReceipt(
     to: string,
     name: string,

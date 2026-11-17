@@ -5,12 +5,18 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { randomInt, randomUUID } from 'node:crypto';
 import {
   PRICING,
+  SEAT_LIMITS,
   formatReceiptNo,
+  joinFeeLines,
+  platformFeeLines,
+  reverseLines,
+  type AdminPaymentRow,
   type PublishOrderDto,
   type PublishResultDto,
   type VerifyPaymentInput,
@@ -18,8 +24,10 @@ import {
 import { computeJoinState, normalizeCode } from '../enrollments/join-state';
 import { AuditService } from '../audit/audit.service';
 import type { AuthUser } from '../common/decorators';
+import { LedgerService } from '../ledger/ledger.service';
 import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { outstandingSeats, seatToken } from '../seats/capacity';
 import { FakePaymentProvider, PAYMENT_PROVIDER, PaymentProvider } from './provider';
 
 // No 0/O/1/I/L so codes are easy to read out loud.
@@ -41,6 +49,7 @@ export class PaymentsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly mail: MailService,
+    private readonly ledger: LedgerService,
     @Inject(PAYMENT_PROVIDER) private readonly provider: PaymentProvider,
   ) {
     if (provider.name === 'fake') {
@@ -259,7 +268,28 @@ export class PaymentsService {
       });
       if (claimed.count === 0) return null;
 
-      if (payment.purpose === 'EXAM_JOIN') return this.enroll(tx, payment);
+      // The money is in; the ledger records who it belongs to, in the same transaction.
+      if (payment.purpose === 'EXAM_JOIN') {
+        const result = await this.enroll(tx, payment);
+        const lines =
+          result.enrollment && result.exam
+            ? joinFeeLines(payment.amountPaise, result.exam.examinerId, result.exam.id)
+            : platformFeeLines(payment.amountPaise, payment.examId, 'NO_SEAT_REFUND_DUE');
+        await this.ledger.post(tx, lines, { type: 'CREDIT', paymentId: payment.id });
+        return result;
+      }
+      if (payment.purpose === 'SEAT_PACK') {
+        // Sponsored seats: no trainer share, the whole fee is NandiVex's (default Q1).
+        await this.ledger.post(tx, platformFeeLines(payment.amountPaise, payment.examId), {
+          type: 'CREDIT',
+          paymentId: payment.id,
+        });
+        return this.createSeatPack(tx, payment);
+      }
+      await this.ledger.post(tx, platformFeeLines(payment.amountPaise, payment.examId), {
+        type: 'CREDIT',
+        paymentId: payment.id,
+      });
       if (!payment.examId) return { exam: null };
       const exam = await tx.exam.findUnique({ where: { id: payment.examId } });
       if (!exam || exam.status !== 'DRAFT') return { exam: exam ?? null };
@@ -286,6 +316,23 @@ export class PaymentsService {
       });
       if (payment.purpose === 'EXAM_JOIN') {
         await this.afterEnroll(payment.id, payment.userId, published, fresh);
+      } else if (payment.purpose === 'SEAT_PACK') {
+        const buyer = await this.prisma.user.findUnique({ where: { id: payment.userId } });
+        if (buyer && published.exam) {
+          await this.mail.sendSeatReceipt(buyer.email, buyer.name, {
+            examTitle: published.exam.title,
+            seats: payment.quantity,
+            receiptNo: formatReceiptNo(fresh.receiptNo),
+            amountPaise: fresh.amountPaise,
+            paidAt: fresh.capturedAt ?? new Date(),
+          });
+        } else if (!published.exam) {
+          await this.audit.log({
+            action: 'payment.orphan',
+            entity: 'Payment',
+            entityId: payment.id,
+          });
+        }
       } else if (!published.exam) {
         // Paid, but the exam was deleted meanwhile: flag for a manual refund.
         await this.audit.log({ action: 'payment.orphan', entity: 'Payment', entityId: payment.id });
@@ -321,7 +368,7 @@ export class PaymentsService {
       startsAt: exam.startsAt,
       endsAt: exam.endsAt,
       maxStudents: exam.maxStudents,
-      seatsTaken: exam._count.enrollments,
+      seatsTaken: exam._count.enrollments + (await outstandingSeats(this.prisma, exam.id)),
       alreadyEnrolled: Boolean(enrolled),
     });
     if (state === 'ALREADY_ENROLLED')
@@ -375,6 +422,236 @@ export class PaymentsService {
     };
   }
 
+  // ------------------------------------------------------------ sponsored seats
+
+  /** A trainer buys N seats for their students in one order (N x the join fee). */
+  async createSeatOrder(user: AuthUser, examId: string, seats: number): Promise<PublishOrderDto> {
+    if (seats < 1 || seats > SEAT_LIMITS.MAX_PER_ORDER) {
+      throw new BadRequestException(
+        `Buy between 1 and ${SEAT_LIMITS.MAX_PER_ORDER} seats at a time`,
+      );
+    }
+    const exam = UUID.test(examId)
+      ? await this.prisma.exam.findFirst({
+          where: { id: examId, examinerId: user.id },
+          include: { _count: { select: { enrollments: true } } },
+        })
+      : null;
+    if (!exam) throw new NotFoundException('Exam not found');
+    if (exam.status !== 'PUBLISHED') {
+      throw new ConflictException('Seats can be bought once the exam is published');
+    }
+    if (exam.endsAt && exam.endsAt <= new Date())
+      throw new ConflictException('This exam has ended');
+    const free =
+      exam.maxStudents - exam._count.enrollments - (await outstandingSeats(this.prisma, exam.id));
+    if (seats > free) {
+      throw new ConflictException(`Only ${Math.max(0, free)} seat(s) are left in this exam`);
+    }
+
+    const amountPaise = PRICING.EXAM_JOIN_PAISE * seats;
+    const order = await this.provider.createOrder({
+      amountPaise,
+      currency: PRICING.CURRENCY,
+      receipt: `seats_${exam.id.slice(0, 8)}_${Date.now().toString(36)}`,
+    });
+    await this.prisma.payment.create({
+      data: {
+        userId: user.id,
+        examId: exam.id,
+        purpose: 'SEAT_PACK',
+        amountPaise,
+        quantity: seats,
+        currency: PRICING.CURRENCY,
+        provider: this.provider.name,
+        providerOrderId: order.orderId,
+      },
+    });
+    await this.audit.log({
+      actorId: user.id,
+      action: 'payment.order.seats',
+      entity: 'Exam',
+      entityId: exam.id,
+      meta: { seats },
+    });
+    return {
+      provider: this.provider.name,
+      orderId: order.orderId,
+      amountPaise,
+      currency: PRICING.CURRENCY,
+      keyId: this.provider.publicKeyId,
+      description: `${seats} seat${seats === 1 ? '' : 's'} for: ${exam.title}`.slice(0, 250),
+    };
+  }
+
+  /** Runs inside the capture transaction: creates the paid seats. */
+  private async createSeatPack(
+    tx: Prisma.TransactionClient,
+    payment: { id: string; userId: string; examId: string | null; quantity: number },
+  ) {
+    const exam = payment.examId
+      ? await tx.exam.findUnique({ where: { id: payment.examId } })
+      : null;
+    if (!exam) return { exam: null };
+    const pack = await tx.seatPack.create({
+      data: {
+        examId: exam.id,
+        sponsorId: payment.userId,
+        paymentId: payment.id,
+        seats: payment.quantity,
+      },
+    });
+    await tx.seat.createMany({
+      data: Array.from({ length: payment.quantity }, () => ({
+        packId: pack.id,
+        token: seatToken(),
+      })),
+    });
+    return { exam };
+  }
+
+  // ------------------------------------------------------------------ refunds
+
+  /**
+   * Admin-initiated refund. The gateway sends the money back, the ledger reverses both shares
+   * (so the trainer's accrued share goes down too) and the seat or enrollment is cancelled.
+   */
+  async refund(admin: AuthUser, paymentId: string, reason: string) {
+    const payment = UUID.test(paymentId)
+      ? await this.prisma.payment.findUnique({
+          where: { id: paymentId },
+          include: {
+            user: { select: { name: true, email: true } },
+            exam: { select: { title: true } },
+            enrollment: { include: { attempt: { select: { id: true } } } },
+            seatPack: { include: { items: true } },
+          },
+        })
+      : null;
+    if (!payment) throw new NotFoundException('Payment not found');
+    if (payment.status === 'REFUNDED')
+      throw new ConflictException('This payment is already refunded');
+    if (payment.status !== 'CAPTURED' || !payment.providerPaymentId) {
+      throw new ConflictException('Only a captured payment can be refunded');
+    }
+    if (payment.purpose === 'EXAM_CREATION') {
+      throw new ConflictException('Exam creation fees are not refunded here');
+    }
+    if (payment.enrollment?.attempt) {
+      throw new ConflictException(
+        'This student has already started the exam, so the seat cannot be cancelled',
+      );
+    }
+    if (payment.seatPack?.items.some((i) => i.redeemedAt)) {
+      throw new ConflictException(
+        'Some of these seats were already used, so the order cannot be refunded',
+      );
+    }
+
+    // Claim first so two admins cannot refund the same payment twice.
+    const claimed = await this.prisma.payment.updateMany({
+      where: { id: payment.id, status: 'CAPTURED' },
+      data: { status: 'REFUNDED', refundedAt: new Date(), refundReason: reason },
+    });
+    if (claimed.count === 0) throw new ConflictException('This payment is already refunded');
+
+    let refundId: string;
+    try {
+      refundId = (await this.provider.refund(payment.providerPaymentId, payment.amountPaise))
+        .refundId;
+    } catch (err) {
+      await this.prisma.payment.update({
+        where: { id: payment.id },
+        data: { status: 'CAPTURED', refundedAt: null, refundReason: null },
+      });
+      this.logger.error('Refund failed at the gateway', err as Error);
+      throw new ServiceUnavailableException(
+        'The payment gateway could not process the refund. Try again.',
+      );
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      const original = await tx.ledgerEntry.findMany({
+        where: { paymentId: payment.id, type: 'CREDIT' },
+      });
+      await this.ledger.post(
+        tx,
+        reverseLines(
+          original.map((e) => ({
+            account: e.account,
+            amountPaise: e.amountPaise,
+            examId: e.examId,
+            note: e.note ?? undefined,
+          })),
+        ),
+        { type: 'REFUND', paymentId: payment.id },
+      );
+      if (payment.enrollment) await tx.enrollment.delete({ where: { id: payment.enrollment.id } });
+      if (payment.seatPack) await tx.seatPack.delete({ where: { id: payment.seatPack.id } });
+      await tx.payment.update({ where: { id: payment.id }, data: { refundId } });
+    });
+    await this.audit.log({
+      actorId: admin.id,
+      action: 'payment.refund',
+      entity: 'Payment',
+      entityId: payment.id,
+      meta: { amountPaise: payment.amountPaise, reason, refundId },
+    });
+    await this.mail.sendRefundNotice(payment.user.email, payment.user.name, {
+      amountPaise: payment.amountPaise,
+      what:
+        payment.purpose === 'SEAT_PACK'
+          ? `${payment.quantity} seat(s) in "${payment.exam?.title ?? 'an exam'}"`
+          : `your seat in "${payment.exam?.title ?? 'an exam'}"`,
+      reason,
+    });
+    return { refunded: true as const, refundId };
+  }
+
+  /** Recent payments for the admin to find and refund. */
+  async listForAdmin(filter: {
+    status?: string;
+    purpose?: string;
+    q?: string;
+  }): Promise<AdminPaymentRow[]> {
+    const rows = await this.prisma.payment.findMany({
+      where: {
+        status: (['CREATED', 'CAPTURED', 'FAILED', 'REFUNDED'] as const).find(
+          (s) => s === filter.status,
+        ),
+        purpose: (['EXAM_CREATION', 'EXAM_JOIN', 'SEAT_PACK'] as const).find(
+          (p) => p === filter.purpose,
+        ),
+        ...(filter.q
+          ? {
+              OR: [
+                { user: { email: { contains: filter.q, mode: 'insensitive' as const } } },
+                { user: { name: { contains: filter.q, mode: 'insensitive' as const } } },
+                { exam: { title: { contains: filter.q, mode: 'insensitive' as const } } },
+              ],
+            }
+          : {}),
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+      include: { user: { select: { name: true, email: true } }, exam: { select: { title: true } } },
+    });
+    return rows.map((p) => ({
+      id: p.id,
+      receiptNo: formatReceiptNo(p.receiptNo),
+      purpose: p.purpose,
+      status: p.status,
+      amountPaise: p.amountPaise,
+      userName: p.user.name,
+      userEmail: p.user.email,
+      examTitle: p.exam?.title ?? null,
+      quantity: p.quantity,
+      capturedAt: p.capturedAt?.toISOString() ?? null,
+      refundedAt: p.refundedAt?.toISOString() ?? null,
+      refundReason: p.refundReason,
+    }));
+  }
+
   /** Runs inside the capture transaction: takes a seat, or explains why it could not. */
   private async enroll(
     tx: Prisma.TransactionClient,
@@ -390,7 +667,9 @@ export class PaymentsService {
       where: { examId_studentId: { examId: exam.id, studentId: payment.userId } },
     });
     if (already) return { exam, enrollment: null, reason: 'DUPLICATE' };
-    const taken = await tx.enrollment.count({ where: { examId: exam.id } });
+    const taken =
+      (await tx.enrollment.count({ where: { examId: exam.id } })) +
+      (await outstandingSeats(tx, exam.id));
     if (taken >= exam.maxStudents) return { exam, enrollment: null, reason: 'FULL' };
     const enrollment = await tx.enrollment.create({
       data: { examId: exam.id, studentId: payment.userId, paymentId: payment.id },

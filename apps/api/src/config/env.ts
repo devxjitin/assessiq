@@ -6,6 +6,8 @@ const schema = z.object({
   DATABASE_URL: z.string().min(1),
   JWT_ACCESS_SECRET: z.string().min(32, 'JWT_ACCESS_SECRET must be at least 32 characters'),
   OTP_SECRET: z.string().min(32, 'OTP_SECRET must be at least 32 characters'),
+  // Encrypts trainers' bank account numbers. Falls back to OTP_SECRET when not set.
+  DATA_ENCRYPTION_KEY: z.string().min(32).optional(),
   WEB_ORIGIN: z.string().default('http://localhost:3000'),
   MAIL_TRANSPORT: z.enum(['ses', 'log', 'memory']).default('log'),
   SES_FROM_EMAIL: z.string().default('no-reply@assessiq.nandivex.in'),

@@ -22,10 +22,10 @@ Legend: ✅ done · 🟡 partly done · ⬜ not started · ⛔ blocked
 | P1 Core MVP   | **S4** Join & take exam                            | ✅ Done, on staging                          | Join by code + fee, server-timed attempt, shuffle, autosave, strikes. 24 new tests.                                                                                       |
 | P1 Core MVP   | **S5** Grading & results                           | ✅ Done locally, not deployed                | Auto-marking, partial credit, written-answer marking, publish results, CSV. 36 new tests.                                                                                 |
 | P2            | **S6** Coding engine · **S7** Integrity            | S6, S7 ✅ done locally; S6 deployed, S7 not yet | S7: question pools, one device per attempt, integrity report, join-code limiter, copied-code check. 22 new tests. |
-| P3            | S8 Ledger/payouts · S9 Certificates · S10 Practice | ⬜                                           |                                                                                                                                                                           |
+| P3            | **S8** Ledger/payouts · S9 Certificates · S10 Practice | S8 ✅ done locally, not deployed; S9, S10 ⬜ | S8: ledger, earnings, manual payouts with UTR and statements, refunds, sponsored seats. 31 new tests. |
 | P4            | S11 Admin & migration · S12 Launch                 | ⬜                                           |                                                                                                                                                                           |
 
-**Sprints done: 8 of 13 (S0 to S7; S3 runs on a fake payment provider until Razorpay test keys are added).** Overall, the identity layer and the whole deployment pipeline (to staging) are in place; trainers can build draft exams; payments, taking exams and certificates do not exist yet.
+**Sprints done: 9 of 13 (S0 to S8; S3 runs on a fake payment provider until Razorpay test keys are added).** Overall, the identity layer and the whole deployment pipeline (to staging) are in place; trainers can build draft exams; payments, taking exams and certificates do not exist yet.
 
 **What exists today:** a private-by-default API with login and roles, a web app with sign-up/sign-in/profile/admin user list, a Postgres database with migrations, AWS staging (VPC, EC2, RDS, S3, CloudFront, ECR, SES, IAM deploy role), HTTPS on both hostnames, and 99 passing automated tests.
 
@@ -339,6 +339,39 @@ Each sprint ends with a demo on `staging` and a short retro. "Done" means code r
 | **S4: Join & take exam** ✅  | Student exam engine | Join by code → ₹149 payment → enrollment; exam lobby; **server-timed attempt**, per-student shuffle, autosave, navigator/flagging, submit/auto-submit; ported anti-cheat with server-side event logging and strike decision           | Answers survive a page refresh/network drop; late submissions rejected; the API never returns correct answers |
 | **S5: Grading & results** ✅ | Results             | Auto-grade single/multi MCQ (all-or-nothing/partial), subjective grading screen with rubric and feedback, finalise results, student result page and scorecard, examiner dashboard (attempts, scores, violations), CSV export          | Grading math covered by unit tests; results hidden until finalised                                            |
 
+#### Sprint 8 completion report ✅ (built and tested locally, including a manual run of the screens; **not yet deployed**)
+
+| Scope item | Status | Where / how |
+| --- | --- | --- |
+| Double-entry ledger | ✅ | Every payment is booked in the same database transaction that captures it. Accounts: `EXTERNAL` (money in/out), `PLATFORM` (NandiVex), `EXAMINER:<id>` (owed to a trainer), `PAYOUTS`. Each transaction adds up to exactly zero; the code refuses anything else. A student's ₹149 becomes ₹74.50 to the trainer and ₹74.50 to NandiVex (odd paise go to NandiVex); a publishing fee and sponsored seats go fully to NandiVex |
+| Trainer earnings dashboard | ✅ | **Earnings** page: Payable now, Accruing (results not yet published), Requested, Paid so far, a per-exam table and payout history |
+| Accrued → payable | ✅ | A trainer's share is *accruing* until the exam's results are published (the refund window), then *payable* |
+| Payout details (UPI / bank) | ✅ | UPI id, or bank name + account number + IFSC. The account number is encrypted (AES-256-GCM) and only the last four digits are ever shown to the trainer; the admin sees the full number only on the payout screen. Changing details clears the "checked by NandiVex" mark |
+| Admin payout screen | ✅ | **Payouts** page: who is owed money, requests, trainer's destination, "mark details checked", then **Mark paid** with the bank/UPI reference (UTR) or **Reject** with a reason. An admin can also pay without a request. Minimum payable ₹500. Two admins cannot pay the same request twice (database lock) |
+| Payout statements | ✅ | CSV per paid payout (trainer or admin): who, amount, where, UTR, date and every earning or refund in the period; the trainer is also emailed when paid |
+| Refunds | ✅ | Admin **Payments** page: search, **Refund** with a reason. The gateway returns the money, the ledger reverses both shares exactly (so the trainer's accrued share drops), the enrollment or seats are cancelled and the customer is emailed. Refused if the student already started the exam, if sponsored seats were used, and for publishing fees. A refund after the trainer was paid shows as "owed back" |
+| Sponsored seats | ✅ | Exam **Seats** tab: buy 1 to 200 seats (N x ₹149, one payment), reserve seats by email (each student is emailed a personal link) or copy open links. A student opens the link and joins without paying. Unused seats count against the exam's student limit. No trainer share on sponsored seats (default Q1) |
+| Ledger check | ✅ | Admin page shows collected, NandiVex revenue, owed to trainers, paid out, and a live "all transactions balance to the paisa" check |
+| Tests | ✅ | **24 API tests** and **7 shared tests** (math, validation); repo total 210 regular tests |
+
+**Findings worth knowing:**
+
+- The gateway fee (about 2% at Razorpay) is **not** deducted anywhere: the split is on the gross amount and NandiVex absorbs the fee (default Q2). Real fees will only be known once Razorpay is live.
+- GST is not modelled; the amounts are treated as inclusive. Q2 (accountant check) is still open before go-live.
+- Bank account numbers are encrypted with `DATA_ENCRYPTION_KEY` (staging gets its own key; if it is not set the app falls back to `OTP_SECRET`). **Changing the key makes saved account numbers unreadable**, and the admin screen then asks the trainer to re-enter them.
+- A refund asks the gateway first, then writes the ledger. If the server dies between the two, the payment is marked refunded but the ledger entry is missing; the ledger check would still balance, so a reconciliation report against Razorpay is worth adding before launch.
+- Real Razorpay refunds have not been run (there are no live or test keys yet); the fake gateway refunds instantly.
+- Student refunds are admin-only for now; there is no self-service refund request.
+
+**Acceptance criteria:** for each ₹149 payment the ledger balances to the paisa ✅ (tested for odd amounts too); a refund reverses both shares ✅; paying out creates a ledger entry and statement ✅; sponsored students join without paying ✅.
+
+**Known gaps after Sprint 8:**
+
+- Not deployed yet; staging runs Sprint 7.
+- Payout statements are CSV only (no PDF).
+- No scheduled payout day or reminder emails; payouts happen when an admin acts.
+- No GST invoices, no Razorpay settlement reconciliation.
+
 #### Sprint 7 completion report ✅ (built and tested locally; **not yet deployed**)
 
 | Scope item | Status | Where / how |
@@ -548,7 +581,7 @@ Each sprint ends with a demo on `staging` and a short retro. "Done" means code r
 
 | Sprint                                       | Goal                            | Scope                                                                                                                                                                                                                                                                                                                                                         | Acceptance criteria                                                                                                                                                            |
 | -------------------------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **S8: Ledger, manual payouts & sponsorship** | Revenue tracking + trainer pays | **Double-entry ledger**, examiner earnings dashboard (accrued/payable/paid), examiner payout details (UPI/bank, encrypted), **admin payout screen** (payable list, minimum threshold, mark paid with UTR, payout statements), **sponsored seats** (bulk buy, CSV assign, redeem links), refunds flow (admin-initiated; reverses the examiner's accrued share) | For each ₹149 payment the ledger balances to the paisa; a refund reverses both shares; paying out creates a ledger entry and statement; sponsored students join without paying |
+| **S8: Ledger, manual payouts & sponsorship** ✅ | Revenue tracking + trainer pays | **Double-entry ledger**, examiner earnings dashboard (accrued/payable/paid), examiner payout details (UPI/bank, encrypted), **admin payout screen** (payable list, minimum threshold, mark paid with UTR, payout statements), **sponsored seats** (bulk buy, CSV assign, redeem links), refunds flow (admin-initiated; reverses the examiner's accrued share) | For each ₹149 payment the ledger balances to the paisa; a refund reverses both shares; paying out creates a ledger entry and statement; sponsored students join without paying |
 | **S9: Certificates**                         | Approved certificates by email  | Certificate template designer (layout, two logos, signature line), PDF generation in worker, serial + QR, **NandiVex admin approval queue** (preview, bulk approve, reject with reason), SES email with attachment, bounce handling, public `/verify/<serial>` page, re-send option                                                                           | No certificate is emailed before admin approval; the verification page shows the correct holder and exam                                                                       |
 | **S10: Practice sets**                       | Post-exam practice              | Practice access unlock (attempted students only, after exam closes), practice mode UI with explanations and instant feedback, coding re-runs, practice history; student dashboard showing exams, results, practice and certificates                                                                                                                           | A student who didn't attempt can't open practice (API returns 403); practice never affects official scores                                                                     |
 

@@ -31,6 +31,8 @@ export interface PaymentProvider {
   /** Checks the webhook signature over the exact raw request body. */
   verifyWebhookSignature(rawBody: Buffer, signature: string | undefined): boolean;
   parseWebhook(body: unknown, eventIdHeader: string | undefined): WebhookInfo;
+  /** Sends the money back to the customer's card or account. */
+  refund(paymentId: string, amountPaise: number): Promise<{ refundId: string }>;
 }
 
 const hmac = (secret: string, data: string | Buffer) =>
@@ -96,6 +98,10 @@ export class FakePaymentProvider implements PaymentProvider {
   }
 
   parseWebhook = parseRazorpayWebhook;
+
+  async refund(): Promise<{ refundId: string }> {
+    return { refundId: `fake_refund_${randomUUID().replace(/-/g, '').slice(0, 14)}` };
+  }
 }
 
 /** Real Razorpay via its REST API (no SDK needed). Verified against Razorpay's documented scheme. */
@@ -146,6 +152,24 @@ export class RazorpayProvider implements PaymentProvider {
   }
 
   parseWebhook = parseRazorpayWebhook;
+
+  async refund(paymentId: string, amountPaise: number): Promise<{ refundId: string }> {
+    const res = await fetch(
+      `https://api.razorpay.com/v1/payments/${encodeURIComponent(paymentId)}/refund`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Basic ${Buffer.from(`${this.keyId}:${this.keySecret}`).toString('base64')}`,
+        },
+        body: JSON.stringify({ amount: amountPaise }),
+      },
+    );
+    if (!res.ok) throw new Error(`Razorpay refund failed with status ${res.status}`);
+    const data = (await res.json()) as { id?: string };
+    if (!data.id) throw new Error('Razorpay returned no refund id');
+    return { refundId: data.id };
+  }
 }
 
 export function createPaymentProvider(env: Env): PaymentProvider {

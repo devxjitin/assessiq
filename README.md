@@ -41,6 +41,14 @@ npm run dev:worker
 
 Still open from Sprint 0: ESLint and commit hooks, design system and wireframes, production Terraform apply, working GitHub Actions (blocked by billing). See the plan file for full status.
 
+## Sprint 8: money (done locally)
+
+- **Ledger:** every payment is booked in a balanced double-entry ledger (`EXTERNAL`, `PLATFORM`, `EXAMINER:<id>`, `PAYOUTS`). Join fee: 50% trainer, 50% NandiVex. Sponsored seats and publishing fees: all NandiVex.
+- **Trainer:** `/earnings` (accruing, payable, requested, paid), payout details (UPI or bank, account number encrypted), `POST /payouts/request`, CSV statements.
+- **Admin:** `/admin/payouts` (pay with UTR, reject, direct payout, ledger check) and `/admin/payments` (search and refund). API under `/admin/finance/*`.
+- **Sponsored seats:** `POST /exams/:id/seats/order`, `GET|POST /exams/:id/seats[/assign]`, student `GET /seats/preview`, `POST /seats/redeem`; link `/redeem/?token=...`.
+- **Config:** `DATA_ENCRYPTION_KEY` (32+ characters) encrypts bank account numbers; falls back to `OTP_SECRET`. Do not change it once trainers have saved details.
+
 ## Sprint 7: exam integrity (done locally)
 
 - **Question pools:** exam setting *Questions per student*; each student gets a random N of the questions and is marked out of those.

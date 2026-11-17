@@ -12,6 +12,8 @@ import { CodeModule } from './code/code.module';
 import { ResultsModule } from './results/results.module';
 import { EnrollmentsModule } from './enrollments/enrollments.module';
 import { PaymentsModule } from './payments/payments.module';
+import { PayoutsModule } from './payouts/payouts.module';
+import { SeatsModule } from './seats/seats.module';
 import { ExamsModule } from './exams/exams.module';
 import { HealthController } from './health/health.controller';
 import { StorageModule } from './storage/storage.module';
@@ -42,6 +44,8 @@ import { UsersModule } from './users/users.module';
     AdminModule,
     ExamsModule,
     PaymentsModule,
+    PayoutsModule,
+    SeatsModule,
     EnrollmentsModule,
     AttemptsModule,
     ResultsModule,

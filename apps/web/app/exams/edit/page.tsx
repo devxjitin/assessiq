@@ -6,6 +6,7 @@ import type { ExamDetailDto, ExamQuestionDto } from '@assessiq/shared';
 import { ExamSettingsForm } from '../../../components/exam-settings-form';
 import { PublishPanel } from '../../../components/publish-panel';
 import { ResultsPanel } from '../../../components/results-panel';
+import { SeatsPanel } from '../../../components/seats-panel';
 import { QuestionEditor } from '../../../components/question-editor';
 import {
   Alert,
@@ -18,7 +19,7 @@ import {
 import { ApiError, api, apiBlob } from '../../../lib/api';
 import { useRequireAuth } from '../../../lib/auth';
 
-type Tab = 'questions' | 'import' | 'settings' | 'logo' | 'publish' | 'results';
+type Tab = 'questions' | 'import' | 'settings' | 'logo' | 'publish' | 'seats' | 'results';
 
 const TYPE_LABEL = {
   SINGLE: 'One correct',
@@ -440,6 +441,7 @@ export default function EditExamPage() {
     ['settings', 'Settings'],
     ['logo', 'Logo'],
     ['publish', locked ? 'Share' : 'Publish'],
+    ...(exam.code && exam.status === 'PUBLISHED' ? ([['seats', 'Seats']] as [Tab, string][]) : []),
     ...(locked ? ([['results', 'Results']] as [Tab, string][]) : []),
   ];
 
@@ -512,6 +514,7 @@ export default function EditExamPage() {
             />
           ))}
         {tab === 'logo' && <LogoTab exam={exam} reload={reload} locked={locked} />}
+        {tab === 'seats' && <SeatsPanel exam={exam} userName={user.name} userEmail={user.email} />}
         {tab === 'results' && <ResultsPanel exam={exam} reload={reload} />}
         {tab === 'publish' && (
           <PublishPanel exam={exam} userName={user.name} userEmail={user.email} reload={reload} />

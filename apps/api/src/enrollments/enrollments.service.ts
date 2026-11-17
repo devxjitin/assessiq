@@ -3,6 +3,7 @@ import { INTEGRITY, PRICING, type EnrollmentDto, type JoinInfoDto } from '@asses
 import { AuditService } from '../audit/audit.service';
 import type { AuthUser } from '../common/decorators';
 import { PrismaService } from '../prisma/prisma.service';
+import { outstandingSeats } from '../seats/capacity';
 import { computeJoinState, normalizeCode } from './join-state';
 
 @Injectable()
@@ -64,7 +65,7 @@ export class EnrollmentsService {
         startsAt: exam.startsAt,
         endsAt: exam.endsAt,
         maxStudents: exam.maxStudents,
-        seatsTaken: exam._count.enrollments,
+        seatsTaken: exam._count.enrollments + (await outstandingSeats(this.prisma, exam.id)),
         alreadyEnrolled: Boolean(enrolled),
       }),
     };

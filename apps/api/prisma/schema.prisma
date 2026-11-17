@@ -43,11 +43,24 @@ enum PaymentStatus {
   CREATED
   CAPTURED
   FAILED
+  REFUNDED
 }
 
 enum PaymentPurpose {
   EXAM_CREATION
   EXAM_JOIN
+  SEAT_PACK
+}
+
+enum PayoutMethod {
+  UPI
+  BANK
+}
+
+enum PayoutStatus {
+  REQUESTED
+  PAID
+  REJECTED
 }
 
 enum AttemptStatus {
@@ -86,41 +99,44 @@ model User {
   payments        Payment[]
   enrollments     Enrollment[]
   attempts        Attempt[]
+  payouts         Payout[]         @relation("PayoutExaminer")
+  seatPacks       SeatPack[]       @relation("SeatSponsor")
 
   @@index([role])
 }
 
 model Exam {
-  id                 String     @id @default(uuid()) @db.Uuid
-  examinerId         String     @db.Uuid
-  title              String
-  description        String?
-  instructions       String?
-  status             ExamStatus @default(DRAFT)
-  durationMinutes    Int        @default(60)
-  startsAt           DateTime?
-  endsAt             DateTime?
-  passPercent        Float      @default(40)
-  shuffleQuestions   Boolean    @default(true)
-  shuffleOptions     Boolean    @default(true)
+  id                  String     @id @default(uuid()) @db.Uuid
+  examinerId          String     @db.Uuid
+  title               String
+  description         String?
+  instructions        String?
+  status              ExamStatus @default(DRAFT)
+  durationMinutes     Int        @default(60)
+  startsAt            DateTime?
+  endsAt              DateTime?
+  passPercent         Float      @default(40)
+  shuffleQuestions    Boolean    @default(true)
+  shuffleOptions      Boolean    @default(true)
   // Question pool: each student gets this many random questions out of all of them (null = all).
   questionsPerStudent Int?
-  maxStudents        Int        @default(1000)
+  maxStudents         Int        @default(1000)
   // Certificate logo for this exam (private S3 key). Falls back to the trainer's default logo.
-  logoKey            String?
+  logoKey             String?
   // Share code (e.g. NVX-7K3P9Q), generated when the creation fee is captured.
-  code               String?    @unique
-  publishedAt        DateTime?
+  code                String?    @unique
+  publishedAt         DateTime?
   // Set when the trainer publishes results to students.
-  resultsPublishedAt DateTime?
-  createdAt          DateTime   @default(now())
-  updatedAt          DateTime   @updatedAt
+  resultsPublishedAt  DateTime?
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
 
   examiner    User         @relation(fields: [examinerId], references: [id], onDelete: Restrict)
   questions   Question[]
   payments    Payment[]
   enrollments Enrollment[]
   attempts    Attempt[]
+  seatPacks   SeatPack[]
 
   @@index([examinerId, createdAt])
   @@index([status])
@@ -153,11 +169,20 @@ model Question {
 }
 
 model ExaminerProfile {
-  userId  String  @id @db.Uuid
-  orgName String?
+  userId                  String        @id @db.Uuid
+  orgName                 String?
   // Trainer's default certificate logo (S3 key); each exam can override it (Sprint 2).
-  logoKey String?
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  logoKey                 String?
+  // Where NandiVex sends the trainer's share. The account number is stored encrypted.
+  payoutMethod            PayoutMethod?
+  upiId                   String?
+  bankAccountName         String?
+  bankAccountNoEnc        String?
+  bankAccountLast4        String?
+  ifsc                    String?
+  payoutDetailsUpdatedAt  DateTime?
+  payoutDetailsVerifiedAt DateTime?
+  user                    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model EmailOtp {
@@ -222,13 +247,19 @@ model Payment {
   providerPaymentId String?        @unique
   status            PaymentStatus  @default(CREATED)
   failureReason     String?
+  // Seats bought in one order (sponsored seats); 1 for everything else.
+  quantity          Int            @default(1)
   capturedAt        DateTime?
+  refundedAt        DateTime?
+  refundReason      String?
+  refundId          String?
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
 
   user       User        @relation(fields: [userId], references: [id], onDelete: Restrict)
   exam       Exam?       @relation(fields: [examId], references: [id], onDelete: SetNull)
   enrollment Enrollment?
+  seatPack   SeatPack?
 
   @@index([userId, createdAt])
   @@index([examId, purpose, status])
@@ -249,6 +280,8 @@ model Enrollment {
   examId    String   @db.Uuid
   studentId String   @db.Uuid
   paymentId String?  @unique @db.Uuid
+  // Set when a sponsored seat paid for this enrollment instead of the student.
+  seatId    String?  @unique @db.Uuid
   createdAt DateTime @default(now())
 
   exam    Exam     @relation(fields: [examId], references: [id], onDelete: Restrict)
@@ -368,4 +401,86 @@ model ProctorEvent {
   attempt Attempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
 
   @@index([attemptId, createdAt])
+}
+
+// ------------------------------------------------------------------ money (Sprint 8)
+
+// Double-entry ledger. Every transaction (txnId) has entries that add up to exactly zero.
+// Accounts: EXTERNAL (money in/out of the business), PLATFORM (NandiVex), EXAMINER:<id>
+// (owed to a trainer), PAYOUTS (money sent to trainers). Amounts are signed paise.
+model LedgerEntry {
+  id          String   @id @default(uuid()) @db.Uuid
+  txnId       String   @db.Uuid
+  account     String
+  amountPaise Int
+  // CREDIT (a payment came in), REFUND (reversal), PAYOUT (paid to a trainer)
+  type        String
+  paymentId   String?  @db.Uuid
+  payoutId    String?  @db.Uuid
+  examId      String?  @db.Uuid
+  note        String?
+  createdAt   DateTime @default(now())
+
+  @@index([account, createdAt])
+  @@index([txnId])
+  @@index([paymentId])
+  @@index([examId])
+}
+
+// A manual payout of a trainer's share: requested by the trainer or created by an admin.
+model Payout {
+  id          String        @id @default(uuid()) @db.Uuid
+  examinerId  String        @db.Uuid
+  amountPaise Int
+  status      PayoutStatus  @default(REQUESTED)
+  method      PayoutMethod?
+  // Masked snapshot of where it was sent, e.g. "name@upi" or "Asha Rao, HDFC0001234 ****6789"
+  destination String?
+  utr         String?
+  note        String?
+  requestedAt DateTime      @default(now())
+  paidAt      DateTime?
+  paidById    String?       @db.Uuid
+  periodFrom  DateTime?
+  periodTo    DateTime?
+
+  examiner User @relation("PayoutExaminer", fields: [examinerId], references: [id], onDelete: Restrict)
+
+  @@index([examinerId, requestedAt])
+  @@index([status])
+}
+
+// Seats a trainer bought for their students. The students join without paying.
+model SeatPack {
+  id        String   @id @default(uuid()) @db.Uuid
+  examId    String   @db.Uuid
+  sponsorId String   @db.Uuid
+  paymentId String   @unique @db.Uuid
+  seats     Int
+  createdAt DateTime @default(now())
+
+  exam    Exam    @relation(fields: [examId], references: [id], onDelete: Restrict)
+  sponsor User    @relation("SeatSponsor", fields: [sponsorId], references: [id], onDelete: Restrict)
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  items   Seat[]
+
+  @@index([examId])
+}
+
+model Seat {
+  id           String    @id @default(uuid()) @db.Uuid
+  packId       String    @db.Uuid
+  // Secret in the redeem link.
+  token        String    @unique
+  // When set, only the student with this email can redeem it.
+  email        String?
+  redeemedById String?   @db.Uuid
+  redeemedAt   DateTime?
+  enrollmentId String?   @unique @db.Uuid
+  createdAt    DateTime  @default(now())
+
+  pack SeatPack @relation(fields: [packId], references: [id], onDelete: Cascade)
+
+  @@index([packId])
+  @@index([email])
 }

@@ -1,19 +1,25 @@
 import {
   Body,
   Controller,
+  Get,
   Headers,
   HttpCode,
   Param,
   Post,
+  Query,
   RawBodyRequest,
   Req,
 } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import type { Request } from 'express';
 import {
+  buySeatsSchema,
   fakeCompleteSchema,
+  refundSchema,
   verifyPaymentSchema,
+  type BuySeatsInput,
   type FakeCompleteInput,
+  type RefundInput,
   type VerifyPaymentInput,
 } from '@assessiq/shared';
 import { AuthUser, CurrentUser, Public, Roles } from '../common/decorators';
@@ -30,6 +36,41 @@ export class PaymentsController {
   @HttpCode(200)
   createOrder(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.payments.createPublishOrder(user, id);
+  }
+
+  /** Trainer: buy seats for students (N x the join fee). */
+  @Roles('EXAMINER')
+  @Post('exams/:id/seats/order')
+  @HttpCode(200)
+  createSeatOrder(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(buySeatsSchema)) body: BuySeatsInput,
+  ) {
+    return this.payments.createSeatOrder(user, id, body.seats);
+  }
+
+  /** Admin: find payments. */
+  @Roles('ADMIN')
+  @Get('admin/finance/payments')
+  adminList(
+    @Query('status') status?: string,
+    @Query('purpose') purpose?: string,
+    @Query('q') q?: string,
+  ) {
+    return this.payments.listForAdmin({ status, purpose, q: q?.trim() || undefined });
+  }
+
+  /** Admin: refund a payment. Reverses the trainer's share and cancels the seat. */
+  @Roles('ADMIN')
+  @Post('admin/finance/payments/:id/refund')
+  @HttpCode(200)
+  adminRefund(
+    @CurrentUser() admin: AuthUser,
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(refundSchema)) body: RefundInput,
+  ) {
+    return this.payments.refund(admin, id, body.reason);
   }
 
   /** Student: start (or resume) the join-fee order for an exam code. */
