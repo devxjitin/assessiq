@@ -3,7 +3,14 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import type { JoinInfoDto, PublishOrderDto } from '@assessiq/shared';
-import { Alert, Button, Shell, describeError, useQueryParam } from '../../components/ui';
+import {
+  Alert,
+  Button,
+  PageHeader,
+  Shell,
+  describeError,
+  useQueryParam,
+} from '../../components/ui';
 import { ApiError, api } from '../../lib/api';
 import { useRequireAuth } from '../../lib/auth';
 import { runCheckout } from '../../lib/checkout';
@@ -101,79 +108,78 @@ export default function JoinPage() {
   const canPay = info && (info.state === 'OPEN' || info.state === 'NOT_STARTED');
 
   return (
-    <Shell>
-      <section className="card">
-        <h1>Join an exam</h1>
-        <p className="muted">Enter the code your trainer gave you.</p>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            void lookup(code);
-          }}
-        >
-          <label className="field">
-            <span>Exam code</span>
-            <input
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              placeholder="NVX-XXXXXX"
-              autoCapitalize="characters"
-              autoComplete="off"
-            />
-          </label>
-          <Button type="submit" loading={busy && !info} disabled={!code.trim()}>
-            Find exam
-          </Button>
-        </form>
-        {error && <Alert>{error}</Alert>}
-      </section>
-
-      {info && (
-        <section className="card" style={{ marginTop: 16 }}>
-          <h2 style={{ marginTop: 0 }}>{info.title}</h2>
-          <p className="muted">
-            By {info.trainerName}
-            {info.orgName ? `, ${info.orgName}` : ''}
-          </p>
-          {info.description && <p>{info.description}</p>}
-          <ul className="muted" style={{ paddingLeft: 18 }}>
-            <li>
-              {info.questionCount} questions · {info.totalMarks} marks · {info.durationMinutes}{' '}
-              minutes
-            </li>
-            <li>Opens: {when(info.startsAt)}</li>
-            <li>Closes: {when(info.endsAt)}</li>
-          </ul>
-          {joined && (
-            <Alert kind="success">You have joined this exam. A receipt was emailed to you.</Alert>
-          )}
-          {note && <Alert kind="info">{note}</Alert>}
-          {STATE_TEXT[info.state] && !joined && (
-            <Alert kind={info.state === 'NOT_STARTED' ? 'info' : 'error'}>
-              {STATE_TEXT[info.state]}
-            </Alert>
-          )}
-          {canPay && (
-            <div>
-              <p style={{ margin: '0 0 8px' }}>
-                Exam fee: <strong>{rupees(info.feePaise)}</strong>{' '}
-                <span className="muted">(inclusive of applicable taxes)</span>
-              </p>
-              <Button loading={busy} onClick={pay}>
-                Pay {rupees(info.feePaise)} and join
-              </Button>
-            </div>
-          )}
-          {info.state === 'ALREADY_ENROLLED' && (
-            <Link className="btn btn-primary btn-link" href="/dashboard/">
-              Go to my exams
-            </Link>
-          )}
+    <Shell wide>
+      <PageHeader title="Join an exam" subtitle="Enter the code your trainer gave you." />
+      <div className="two-eq">
+        <section className="card">
+          <h2 style={{ marginTop: 0 }}>Exam code</h2>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              void lookup(code);
+            }}
+          >
+            <label className="field">
+              <span>Exam code</span>
+              <input
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                placeholder="NVX-XXXXXX"
+                autoCapitalize="characters"
+                autoComplete="off"
+              />
+            </label>
+            <Button type="submit" loading={busy && !info} disabled={!code.trim()}>
+              Find exam
+            </Button>
+          </form>
+          {error && <Alert>{error}</Alert>}
         </section>
-      )}
-      <p className="links">
-        <Link href="/dashboard/">Back to dashboard</Link>
-      </p>
+
+        {info && (
+          <section className="card">
+            <h2 style={{ marginTop: 0 }}>{info.title}</h2>
+            <p className="muted">
+              By {info.trainerName}
+              {info.orgName ? `, ${info.orgName}` : ''}
+            </p>
+            {info.description && <p>{info.description}</p>}
+            <ul className="muted" style={{ paddingLeft: 18 }}>
+              <li>
+                {info.questionCount} questions · {info.totalMarks} marks · {info.durationMinutes}{' '}
+                minutes
+              </li>
+              <li>Opens: {when(info.startsAt)}</li>
+              <li>Closes: {when(info.endsAt)}</li>
+            </ul>
+            {joined && (
+              <Alert kind="success">You have joined this exam. A receipt was emailed to you.</Alert>
+            )}
+            {note && <Alert kind="info">{note}</Alert>}
+            {STATE_TEXT[info.state] && !joined && (
+              <Alert kind={info.state === 'NOT_STARTED' ? 'info' : 'error'}>
+                {STATE_TEXT[info.state]}
+              </Alert>
+            )}
+            {canPay && (
+              <div>
+                <p style={{ margin: '0 0 8px' }}>
+                  Exam fee: <strong>{rupees(info.feePaise)}</strong>{' '}
+                  <span className="muted">(inclusive of applicable taxes)</span>
+                </p>
+                <Button loading={busy} onClick={pay}>
+                  Pay {rupees(info.feePaise)} and join
+                </Button>
+              </div>
+            )}
+            {info.state === 'ALREADY_ENROLLED' && (
+              <Link className="btn btn-primary btn-link" href="/dashboard/">
+                Go to my exams
+              </Link>
+            )}
+          </section>
+        )}
+      </div>
     </Shell>
   );
 }

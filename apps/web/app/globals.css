@@ -285,7 +285,6 @@ h3 {
   background: var(--surface-2);
 }
 .content {
-  max-width: 1120px;
   padding: 8px 28px 64px;
 }
 .scrim {
@@ -788,9 +787,6 @@ tbody tr:last-child td {
   padding: 6px;
   background: #fff;
 }
-.content-narrow {
-  max-width: 680px;
-}
 .q-options li.wrong {
   border-color: var(--danger);
   color: var(--danger);
@@ -801,4 +797,78 @@ tbody tr:last-child td {
   padding: 10px 12px;
   background: var(--surface-2);
   white-space: pre-wrap;
+}
+
+/* ---------- structured forms ---------- */
+.form-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+  margin-top: 0;
+}
+.form-full {
+  grid-column: 1 / -1;
+}
+.form-side {
+  display: grid;
+  gap: 16px;
+}
+.form-section {
+  display: grid;
+  gap: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  box-shadow: var(--shadow);
+}
+.form-section h3 {
+  margin: 0;
+  font-size: 1.02rem;
+}
+.form-section .card-sub {
+  margin: -10px 0 0;
+}
+.form-section .field textarea {
+  min-height: 120px;
+}
+.card .form-layout .form-section {
+  border: 0;
+  padding: 0;
+  box-shadow: none;
+  background: none;
+}
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+.two-eq {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+.two-eq form {
+  margin-top: 12px;
+}
+@media (max-width: 900px) {
+  .form-layout,
+  .two-eq {
+    grid-template-columns: 1fr;
+  }
+}
+.field input,
+.field select,
+.field textarea {
+  width: 100%;
+  min-width: 0;
+}
+.field input[type='checkbox'],
+.field input[type='radio'] {
+  width: auto;
+}
+.form-layout > *,
+.two-eq > * {
+  min-width: 0;
 }

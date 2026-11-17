@@ -10,6 +10,7 @@ import {
   Card,
   Field,
   FieldErrors,
+  PageHeader,
   Shell,
   describeError,
   validate,
@@ -83,62 +84,59 @@ export default function ProfilePage() {
   }
 
   return (
-    <Shell>
-      <Card title="Your profile" subtitle={user.email}>
-        <form onSubmit={saveProfile} noValidate>
-          <Field
-            label="Full name"
-            name="name"
-            defaultValue={user.name}
-            error={profileErrors.name}
-          />
-          <Field
-            label="Phone"
-            name="phone"
-            type="tel"
-            defaultValue={user.phone ?? ''}
-            error={profileErrors.phone}
-          />
-          {user.role === 'EXAMINER' && (
+    <Shell wide>
+      <PageHeader title="Profile" subtitle="Your details and password." />
+      <div className="two-eq">
+        <Card title="Your profile" subtitle={user.email}>
+          <form onSubmit={saveProfile} noValidate>
             <Field
-              label="Organisation"
-              name="orgName"
-              defaultValue={user.orgName ?? ''}
-              error={profileErrors.orgName}
+              label="Full name"
+              name="name"
+              defaultValue={user.name}
+              error={profileErrors.name}
             />
-          )}
-          {profileMsg && <Alert kind={profileMsg.kind}>{profileMsg.text}</Alert>}
-          <Button type="submit">Save changes</Button>
-        </form>
-      </Card>
+            <Field
+              label="Phone"
+              name="phone"
+              type="tel"
+              defaultValue={user.phone ?? ''}
+              error={profileErrors.phone}
+            />
+            {user.role === 'EXAMINER' && (
+              <Field
+                label="Organisation"
+                name="orgName"
+                defaultValue={user.orgName ?? ''}
+                error={profileErrors.orgName}
+              />
+            )}
+            {profileMsg && <Alert kind={profileMsg.kind}>{profileMsg.text}</Alert>}
+            <Button type="submit">Save changes</Button>
+          </form>
+        </Card>
 
-      <div style={{ height: 16 }} />
-
-      <Card title="Change password">
-        <form onSubmit={changePassword} noValidate>
-          <Field
-            label="Current password"
-            name="currentPassword"
-            type="password"
-            autoComplete="current-password"
-            error={pwErrors.currentPassword}
-          />
-          <Field
-            label="New password"
-            name="newPassword"
-            type="password"
-            autoComplete="new-password"
-            hint="At least 10 characters, with a letter and a number."
-            error={pwErrors.newPassword}
-          />
-          {pwMsg && <Alert kind={pwMsg.kind}>{pwMsg.text}</Alert>}
-          <Button type="submit">Change password</Button>
-        </form>
-      </Card>
-
-      <p className="links">
-        <Link href="/dashboard/">Back to dashboard</Link>
-      </p>
+        <Card title="Change password">
+          <form onSubmit={changePassword} noValidate>
+            <Field
+              label="Current password"
+              name="currentPassword"
+              type="password"
+              autoComplete="current-password"
+              error={pwErrors.currentPassword}
+            />
+            <Field
+              label="New password"
+              name="newPassword"
+              type="password"
+              autoComplete="new-password"
+              hint="At least 10 characters, with a letter and a number."
+              error={pwErrors.newPassword}
+            />
+            {pwMsg && <Alert kind={pwMsg.kind}>{pwMsg.text}</Alert>}
+            <Button type="submit">Change password</Button>
+          </form>
+        </Card>
+      </div>
     </Shell>
   );
 }

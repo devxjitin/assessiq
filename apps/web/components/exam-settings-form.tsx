@@ -79,92 +79,118 @@ export function ExamSettingsForm({
   }
 
   return (
-    <form onSubmit={submit} noValidate>
-      {message && <Alert>{message}</Alert>}
-      {saved && <Alert kind="success">Saved.</Alert>}
-      <Field
-        label="Exam title"
-        name="title"
-        defaultValue={initial?.title}
-        error={errors.title}
-        maxLength={150}
-      />
-      <label className="field">
-        <span>Description (optional)</span>
-        <textarea name="description" defaultValue={initial?.description ?? ''} maxLength={2000} />
-        {errors.description && <small className="error-text">{errors.description}</small>}
-      </label>
-      <label className="field">
-        <span>Instructions shown to students (optional)</span>
-        <textarea name="instructions" defaultValue={initial?.instructions ?? ''} maxLength={4000} />
-        {errors.instructions && <small className="error-text">{errors.instructions}</small>}
-      </label>
-      <div className="row">
+    <form className="form-layout" onSubmit={submit} noValidate>
+      {(message || saved) && (
+        <div className="form-full">
+          {message && <Alert>{message}</Alert>}
+          {saved && <Alert kind="success">Saved.</Alert>}
+        </div>
+      )}
+
+      <section className="form-section">
+        <h3>Basics</h3>
+        <p className="card-sub">What students see before and during the exam.</p>
         <Field
-          label="Duration (minutes)"
-          name="durationMinutes"
-          type="number"
-          min={5}
-          max={360}
-          defaultValue={initial?.durationMinutes ?? 60}
-          error={errors.durationMinutes}
+          label="Exam title"
+          name="title"
+          defaultValue={initial?.title}
+          error={errors.title}
+          maxLength={150}
         />
-        <Field
-          label="Pass mark (%)"
-          name="passPercent"
-          type="number"
-          min={0}
-          max={100}
-          step="0.5"
-          defaultValue={initial?.passPercent ?? 40}
-          error={errors.passPercent}
-        />
-        <Field
-          label="Max students"
-          name="maxStudents"
-          type="number"
-          min={1}
-          max={1000}
-          defaultValue={initial?.maxStudents ?? 1000}
-          error={errors.maxStudents}
-        />
+        <label className="field">
+          <span>Description (optional)</span>
+          <textarea name="description" defaultValue={initial?.description ?? ''} maxLength={2000} />
+          {errors.description && <small className="error-text">{errors.description}</small>}
+        </label>
+        <label className="field">
+          <span>Instructions shown to students (optional)</span>
+          <textarea
+            name="instructions"
+            defaultValue={initial?.instructions ?? ''}
+            maxLength={4000}
+          />
+          {errors.instructions && <small className="error-text">{errors.instructions}</small>}
+        </label>
+      </section>
+
+      <div className="form-side">
+        <section className="form-section">
+          <h3>Schedule</h3>
+          <p className="card-sub">Both dates are needed before you publish.</p>
+          <Field
+            label="Opens at"
+            name="startsAt"
+            type="datetime-local"
+            defaultValue={toLocalInput(initial?.startsAt)}
+            error={errors.startsAt}
+          />
+          <Field
+            label="Closes at"
+            name="endsAt"
+            type="datetime-local"
+            defaultValue={toLocalInput(initial?.endsAt)}
+            error={errors.endsAt}
+          />
+        </section>
+
+        <section className="form-section">
+          <h3>Limits and grading</h3>
+          <Field
+            label="Duration (minutes)"
+            name="durationMinutes"
+            type="number"
+            min={5}
+            max={360}
+            defaultValue={initial?.durationMinutes ?? 60}
+            error={errors.durationMinutes}
+          />
+          <Field
+            label="Pass mark (%)"
+            name="passPercent"
+            type="number"
+            min={0}
+            max={100}
+            step="0.5"
+            defaultValue={initial?.passPercent ?? 40}
+            error={errors.passPercent}
+          />
+          <Field
+            label="Max students"
+            name="maxStudents"
+            type="number"
+            min={1}
+            max={1000}
+            defaultValue={initial?.maxStudents ?? 1000}
+            error={errors.maxStudents}
+          />
+        </section>
+
+        <section className="form-section">
+          <h3>Shuffling</h3>
+          <label className="check">
+            <input
+              type="checkbox"
+              name="shuffleQuestions"
+              defaultChecked={initial?.shuffleQuestions ?? true}
+            />
+            Shuffle question order for each student
+          </label>
+          <label className="check">
+            <input
+              type="checkbox"
+              name="shuffleOptions"
+              defaultChecked={initial?.shuffleOptions ?? true}
+            />
+            Shuffle answer options
+          </label>
+        </section>
       </div>
-      <div className="row">
-        <Field
-          label="Opens at (optional)"
-          name="startsAt"
-          type="datetime-local"
-          defaultValue={toLocalInput(initial?.startsAt)}
-          error={errors.startsAt}
-          hint="Needed before you publish."
-        />
-        <Field
-          label="Closes at (optional)"
-          name="endsAt"
-          type="datetime-local"
-          defaultValue={toLocalInput(initial?.endsAt)}
-          error={errors.endsAt}
-        />
+
+      <div className="form-full form-actions">
+        <Button type="submit" loading={busy}>
+          {submitLabel}
+        </Button>
       </div>
-      <label className="check">
-        <input
-          type="checkbox"
-          name="shuffleQuestions"
-          defaultChecked={initial?.shuffleQuestions ?? true}
-        />{' '}
-        Shuffle question order for each student
-      </label>
-      <label className="check">
-        <input
-          type="checkbox"
-          name="shuffleOptions"
-          defaultChecked={initial?.shuffleOptions ?? true}
-        />{' '}
-        Shuffle answer options
-      </label>
-      <Button type="submit" loading={busy}>
-        {submitLabel}
-      </Button>
     </form>
   );
 }
