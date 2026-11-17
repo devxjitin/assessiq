@@ -201,10 +201,10 @@ Exam creation fee: INR ${rupees} (inclusive of applicable taxes)
     return this.deliver({
       to,
       subject: `Payout of INR ${rupees} sent`,
-      text: `Hi ${name},\n\nNandiVex has sent your Parakh earnings.\n\nAmount: INR ${rupees}\nSent to: ${r.destination}\nReference (UTR): ${r.utr}\nDate: ${date}\n\nYou can download the statement from the Earnings page.\n`,
+      text: `Hi ${name},\n\nNandiVex has sent your Parakh earnings.\n\nAmount: INR ${rupees}\nSent to: ${r.destination}\nReference (UTR): ${r.utr}\nDate: ${date}\n`,
       html: layout(
         'Your payout was sent',
-        `<p>Hi ${esc(name)}, NandiVex has sent your Parakh earnings.</p><p style="font-size:14px">Amount: <strong>INR ${rupees}</strong><br>Sent to: ${esc(r.destination)}<br>Reference (UTR): <strong>${esc(r.utr)}</strong><br>Date: ${date}</p><p>You can download the statement from the Earnings page.</p>`,
+        `<p>Hi ${esc(name)}, NandiVex has sent your Parakh earnings.</p><p style="font-size:14px">Amount: <strong>INR ${rupees}</strong><br>Sent to: ${esc(r.destination)}<br>Reference (UTR): <strong>${esc(r.utr)}</strong><br>Date: ${date}</p>`,
       ),
     });
   }

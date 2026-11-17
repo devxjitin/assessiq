@@ -169,6 +169,8 @@ export interface ExamSummaryDto {
   endsAt: string | null;
   questionCount: number;
   totalMarks: number;
+  /** Students who joined this exam (set on the trainer's exam list). */
+  joinedCount?: number;
   createdAt: string;
   updatedAt: string;
 }

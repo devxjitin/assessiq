@@ -689,8 +689,7 @@ function Settings() {
     }
     if (
       !window.confirm(
-        `Publishing fee ${rupees(body.examCreationPaise)}, join fee ${rupees(body.examJoinPaise)}, ` +
-          `trainer share ${body.examinerSharePercent}%.\n\nThis applies to payments made from now on. Save?`,
+        `Publishing fee ${rupees(body.examCreationPaise)}, join fee ${rupees(body.examJoinPaise)}.\n\nThis applies to payments made from now on. Save?`,
       )
     ) {
       return;
@@ -710,7 +709,7 @@ function Settings() {
 
   return (
     <section className="card" style={{ maxWidth: 560 }}>
-      <h2 style={{ marginTop: 0 }}>Prices and split</h2>
+      <h2 style={{ marginTop: 0 }}>Prices</h2>
       <p className="muted">
         Changes apply to payments made from now on. Past payments keep what was charged, and the
         ledger is never rewritten. Every change is recorded in the audit log.
@@ -719,18 +718,6 @@ function Settings() {
       {note && <Alert kind="success">{note}</Alert>}
       {field('examCreationPaise', 'Publishing fee', 'Trainers pay this to publish an exam.', '₹')}
       {field('examJoinPaise', 'Join fee', 'Students pay this to join an exam.', '₹')}
-      {field(
-        'examinerSharePercent',
-        'Trainer share',
-        'Percent of each student join fee that goes to the trainer.',
-        '%',
-      )}
-      {field(
-        'minPayoutPaise',
-        'Minimum payout',
-        'A trainer can ask for a payout once this much is payable.',
-        '₹',
-      )}
       <Button loading={busy} onClick={save}>
         Save settings
       </Button>

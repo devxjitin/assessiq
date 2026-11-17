@@ -5,7 +5,6 @@ import {
   ACCOUNTS,
   assertBalanced,
   type BalancesDto,
-  type EarningsExamRow,
   type LedgerCheckDto,
   type LedgerLine,
 } from '@assessiq/shared';
@@ -94,37 +93,6 @@ export class LedgerService {
       owedBackPaise: Math.max(0, -net),
       minPayoutPaise: (await this.settings.get()).minPayoutPaise,
     };
-  }
-
-  /** Earnings per exam for the trainer's dashboard. */
-  async earningsByExam(examinerId: string): Promise<EarningsExamRow[]> {
-    const shares = await this.prisma.ledgerEntry.groupBy({
-      by: ['examId'],
-      where: { account: ACCOUNTS.examiner(examinerId), type: { not: 'PAYOUT' } },
-      _sum: { amountPaise: true },
-    });
-    const exams = await this.prisma.exam.findMany({
-      where: { examinerId, code: { not: null } },
-      select: { id: true, title: true, status: true },
-      orderBy: { createdAt: 'desc' },
-    });
-    const joins = await this.prisma.payment.groupBy({
-      by: ['examId'],
-      where: { purpose: 'EXAM_JOIN', status: 'CAPTURED', exam: { examinerId } },
-      _count: { _all: true },
-      _sum: { amountPaise: true },
-    });
-    const shareOf = new Map(shares.map((s) => [s.examId, s._sum.amountPaise ?? 0]));
-    const joinsOf = new Map(joins.map((j) => [j.examId, j]));
-    return exams.map((e) => ({
-      examId: e.id,
-      title: e.title,
-      status: e.status,
-      joins: joinsOf.get(e.id)?._count._all ?? 0,
-      grossPaise: joinsOf.get(e.id)?._sum.amountPaise ?? 0,
-      sharePaise: shareOf.get(e.id) ?? 0,
-      state: e.status === 'RESULTS_FINAL' ? 'PAYABLE' : 'ACCRUED',
-    }));
   }
 
   /** Proof that the books balance: every transaction and the whole ledger add up to zero. */
