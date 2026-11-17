@@ -327,7 +327,7 @@ function TrainerHome() {
         />
         <StatCard label="Drafts" value={count('draft')} note="not published yet" icon="draft" />
       </div>
-      <div className="two-col">
+      <div className="two-col two-col-even">
         <section className="card">
           <h2 style={{ marginTop: 0 }}>Recent exams</h2>
           <p className="card-sub">Your latest work.</p>
@@ -361,15 +361,13 @@ function TrainerHome() {
         <section className="card">
           <h2 style={{ marginTop: 0 }}>Quick actions</h2>
           <p className="card-sub">Build and share exams.</p>
-          <div className="stack">
+          <div className="actions-list">
             <Link className="btn btn-primary btn-link" href="/exams/new/">
               New exam
             </Link>
-            <div>
-              <Link className="btn btn-secondary btn-link" href="/exams/">
-                All exams
-              </Link>
-            </div>
+            <Link className="btn btn-secondary btn-link" href="/exams/">
+              All exams
+            </Link>
           </div>
         </section>
       </div>

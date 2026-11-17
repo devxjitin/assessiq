@@ -36,10 +36,7 @@ export default function ExamsPage() {
 
   return (
     <Shell wide>
-      <PageHeader
-        title="My exams"
-        subtitle="Build exams, add questions and share them with students."
-      >
+      <PageHeader title="Exams" subtitle="Build exams, add questions and share them with students.">
         <Link className="btn btn-primary btn-link" href="/exams/new/">
           New exam
         </Link>

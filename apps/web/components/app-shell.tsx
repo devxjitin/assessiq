@@ -72,7 +72,7 @@ function navFor(role: string): NavItem[] {
     return [home, { href: '/join/', label: 'Join an exam', icon: 'join' }, profile];
   }
   if (role === 'EXAMINER') {
-    return [home, { href: '/exams/', label: 'My exams', icon: 'exams' }, profile];
+    return [home, { href: '/exams/', label: 'Exams', icon: 'exams' }, profile];
   }
   return [
     home,
@@ -87,7 +87,7 @@ function navFor(role: string): NavItem[] {
 const CRUMBS: Record<string, string> = {
   dashboard: 'Home',
   practice: 'Practice',
-  exams: 'My exams',
+  exams: 'Exams',
   new: 'New exam',
   edit: 'Edit exam',
   preview: 'Preview',
