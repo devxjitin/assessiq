@@ -2,9 +2,14 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
-import type { EnrollmentDto, ExamSummaryDto } from '@assessiq/shared';
+import {
+  CERT_KIND_TITLE,
+  type EnrollmentDto,
+  type ExamSummaryDto,
+  type MyCertificateDto,
+} from '@assessiq/shared';
 import { Alert, Button, PageHeader, Shell, StatCard, StatusBadge } from '../../components/ui';
-import { api } from '../../lib/api';
+import { api, apiBlob } from '../../lib/api';
 import { StudentExams, enrollmentState } from '../../components/student-exams';
 import { useRequireAuth } from '../../lib/auth';
 
@@ -116,6 +121,63 @@ function AdminUsers({ currentUserId }: { currentUserId: string }) {
   );
 }
 
+function Certificates() {
+  const [items, setItems] = useState<MyCertificateDto[]>([]);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    api<MyCertificateDto[]>('/certificates/mine')
+      .then(setItems)
+      .catch(() => undefined);
+  }, []);
+  if (items.length === 0) return null;
+
+  async function download(c: MyCertificateDto) {
+    try {
+      const blob = await apiBlob(`/certificates/${c.id}/pdf`);
+      window.open(URL.createObjectURL(blob), '_blank', 'noopener');
+    } catch {
+      setError('Could not open the certificate. Try again.');
+    }
+  }
+  return (
+    <section className="card" style={{ marginBottom: 16 }}>
+      <h2 style={{ marginTop: 0 }}>Your certificates</h2>
+      {error && <Alert>{error}</Alert>}
+      <div className="table-wrap">
+        <table>
+          <tbody>
+            {items.map((c) => (
+              <tr key={c.id}>
+                <td>
+                  <strong>{c.examTitle}</strong>
+                  <div className="muted">{CERT_KIND_TITLE[c.kind]}</div>
+                </td>
+                <td>
+                  {c.state === 'ISSUED' ? (
+                    <>
+                      <div className="mono">{c.serialNo}</div>
+                      <a href={c.verifyUrl}>Verification link</a>
+                    </>
+                  ) : (
+                    <span className="muted">Waiting for NandiVex to approve it</span>
+                  )}
+                </td>
+                <td>
+                  {c.state === 'ISSUED' && (
+                    <Button small onClick={() => download(c)}>
+                      Download PDF
+                    </Button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
 function StudentHome() {
   const [items, setItems] = useState<EnrollmentDto[] | null>(null);
   const [error, setError] = useState('');
@@ -160,6 +222,7 @@ function StudentHome() {
           icon="check"
         />
       </div>
+      <Certificates />
       <div className="two-col">
         <StudentExams items={items} loadError={error} />
         <section className="card">
@@ -185,6 +248,7 @@ function TrainerHome() {
   const list = exams ?? [];
   return (
     <>
+      <Certificates />
       <div className="stats">
         <StatCard
           label="Exams"

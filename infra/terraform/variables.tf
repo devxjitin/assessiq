@@ -100,3 +100,10 @@ variable "create_github_oidc_provider" {
   type        = bool
   default     = true
 }
+
+variable "ses_events_endpoint" {
+  description = "Full HTTPS URL of the API's mail-events endpoint including its secret key, for example https://api-staging.assessiq.nandivex.in/mail/ses-events?key=SES_EVENTS_KEY. Empty = no subscription."
+  type        = string
+  default     = ""
+  sensitive   = true
+}

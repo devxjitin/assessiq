@@ -96,11 +96,11 @@ export function refreshSession(): Promise<AuthResponse | null> {
 }
 
 /** Fetches a private file (needs the access token, so it cannot be a plain <img src>). */
-export async function apiBlob(path: string): Promise<Blob> {
-  let res = await send(path, {});
+export async function apiBlob(path: string, options: Options = {}): Promise<Blob> {
+  let res = await send(path, options);
   if (res.status === 401) {
     const renewed = await refreshSession();
-    if (renewed) res = await send(path, {});
+    if (renewed) res = await send(path, options);
   }
   if (!res.ok) throw await toError(res);
   return res.blob();

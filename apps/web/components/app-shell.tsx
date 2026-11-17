@@ -83,6 +83,7 @@ function navFor(role: string): NavItem[] {
     home,
     { href: '/admin/payouts/', label: 'Payouts', icon: 'check' },
     { href: '/admin/payments/', label: 'Payments', icon: 'shield' },
+    { href: '/admin/certificates/', label: 'Certificates', icon: 'edit' },
     profile,
   ];
 }
@@ -101,6 +102,8 @@ const CRUMBS: Record<string, string> = {
   admin: 'Admin',
   payouts: 'Payouts',
   payments: 'Payments',
+  certificates: 'Certificates',
+  verify: 'Verify',
   redeem: 'Your seat',
 };
 

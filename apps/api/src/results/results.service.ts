@@ -18,6 +18,7 @@ import {
 import { AuditService } from '../audit/audit.service';
 import type { AuthUser } from '../common/decorators';
 import { PrismaService } from '../prisma/prisma.service';
+import { CertificatesService } from '../certificates/certificates.service';
 import { GradingService } from './grading.service';
 
 const UUID = /^[0-9a-f-]{36}$/i;
@@ -46,6 +47,7 @@ export class ResultsService {
     private readonly prisma: PrismaService,
     private readonly grading: GradingService,
     private readonly audit: AuditService,
+    private readonly certificates: CertificatesService,
   ) {}
 
   // ---------------------------------------------------------------- trainer
@@ -349,6 +351,13 @@ export class ResultsService {
       entity: 'Exam',
       entityId: exam.id,
     });
+    // Certificates are made (and queued for NandiVex to approve) from the published results.
+    // A problem here must never undo the publication itself.
+    try {
+      await this.certificates.createForExam(exam.id);
+    } catch (err) {
+      console.error('Could not create certificates for exam', exam.id, err);
+    }
     return this.results(user, examId);
   }
 

@@ -40,3 +40,11 @@ resource "aws_sesv2_configuration_set_event_destination" "sns" {
     }
   }
 }
+
+# Sends bounce and complaint notices to the API (Sprint 9). The API confirms the subscription itself.
+resource "aws_sns_topic_subscription" "ses_events_api" {
+  count     = var.ses_events_endpoint == "" ? 0 : 1
+  topic_arn = aws_sns_topic.ses_events.arn
+  protocol  = "https"
+  endpoint  = var.ses_events_endpoint
+}

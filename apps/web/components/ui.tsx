@@ -14,6 +14,7 @@ const PUBLIC_PATHS = [
   '/forgot-password',
   '/reset-password',
   '/verify-email',
+  '/verify',
 ];
 
 /**
@@ -23,7 +24,7 @@ const PUBLIC_PATHS = [
 export function Shell({ children, wide }: { children: React.ReactNode; wide?: boolean }) {
   const pathname = (usePathname() ?? '/').replace(/(.)\/$/, '$1');
   if (!PUBLIC_PATHS.includes(pathname)) return <AppShell narrow={!wide}>{children}</AppShell>;
-  if (pathname !== '/') return <AuthShell>{children}</AuthShell>;
+  if (pathname !== '/' && pathname !== '/verify') return <AuthShell>{children}</AuthShell>;
   return (
     <div className="public">
       <header className="public-bar">

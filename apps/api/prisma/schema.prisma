@@ -101,6 +101,7 @@ model User {
   attempts        Attempt[]
   payouts         Payout[]         @relation("PayoutExaminer")
   seatPacks       SeatPack[]       @relation("SeatSponsor")
+  certificates    Certificate[]
 
   @@index([role])
 }
@@ -123,6 +124,8 @@ model Exam {
   maxStudents         Int        @default(1000)
   // Certificate logo for this exam (private S3 key). Falls back to the trainer's default logo.
   logoKey             String?
+  // Certificate settings (layout, colours, wording); null means the defaults.
+  certificate         Json?
   // Share code (e.g. NVX-7K3P9Q), generated when the creation fee is captured.
   code                String?    @unique
   publishedAt         DateTime?
@@ -131,12 +134,13 @@ model Exam {
   createdAt           DateTime   @default(now())
   updatedAt           DateTime   @updatedAt
 
-  examiner    User         @relation(fields: [examinerId], references: [id], onDelete: Restrict)
-  questions   Question[]
-  payments    Payment[]
-  enrollments Enrollment[]
-  attempts    Attempt[]
-  seatPacks   SeatPack[]
+  examiner     User          @relation(fields: [examinerId], references: [id], onDelete: Restrict)
+  questions    Question[]
+  payments     Payment[]
+  enrollments  Enrollment[]
+  attempts     Attempt[]
+  seatPacks    SeatPack[]
+  certificates Certificate[]
 
   @@index([examinerId, createdAt])
   @@index([status])
@@ -483,4 +487,75 @@ model Seat {
 
   @@index([packId])
   @@index([email])
+}
+
+// ----------------------------------------------------------- certificates (Sprint 9)
+
+enum CertificateStatus {
+  GENERATED
+  APPROVED
+  REJECTED
+  EMAILED
+}
+
+enum CertificateKind {
+  ACHIEVEMENT
+  PARTICIPATION
+  TRAINER
+}
+
+// One per finished attempt. The text on it is copied here so it never changes afterwards.
+model Certificate {
+  id             String            @id @default(uuid()) @db.Uuid
+  // Null for a trainer's certificate (it belongs to the exam, not to one attempt).
+  attemptId      String?           @unique @db.Uuid
+  examId         String            @db.Uuid
+  // The holder: the student, or the trainer for a TRAINER certificate.
+  studentId      String            @db.Uuid
+  serialNo       String            @unique
+  kind           CertificateKind
+  status         CertificateStatus @default(GENERATED)
+  holderName     String
+  examTitle      String
+  orgName        String?
+  scorePercent   Float
+  // TRAINER certificates: how many students took the exam.
+  participants   Int?
+  issuedOn       DateTime
+  // HMAC over the printed facts; the verification page recomputes it.
+  verifyHash     String
+  pdfKey         String?
+  pdfError       String?
+  approvedById   String?           @db.Uuid
+  approvedAt     DateTime?
+  rejectedAt     DateTime?
+  rejectReason   String?
+  emailedAt      DateTime?
+  emailAttempts  Int               @default(0)
+  emailNextAt    DateTime?
+  emailError     String?
+  emailMessageId String?
+  emailBouncedAt DateTime?
+  createdAt      DateTime          @default(now())
+
+  exam    Exam @relation(fields: [examId], references: [id], onDelete: Restrict)
+  student User @relation(fields: [studentId], references: [id], onDelete: Restrict)
+
+  @@index([examId, status])
+  @@index([studentId])
+  @@index([status, emailNextAt])
+  @@index([emailMessageId])
+}
+
+// Delivery, bounce and complaint notices from the mail provider (through SNS).
+model EmailEvent {
+  id        String   @id @default(uuid()) @db.Uuid
+  snsId     String   @unique
+  kind      String
+  messageId String
+  recipient String?
+  detail    String?
+  createdAt DateTime @default(now())
+
+  @@index([messageId])
 }

@@ -52,6 +52,30 @@ export class MailService {
     }
   }
 
+  /** Sends a certificate with its PDF attached. Throws on failure so the caller can retry. */
+  async sendCertificate(
+    to: string,
+    name: string,
+    r: { examTitle: string; serialNo: string; verifyUrl: string; pdf: Buffer },
+  ): Promise<string | undefined> {
+    return this.transport.send({
+      to,
+      subject: `Your certificate for "${r.examTitle}"`,
+      text: `Hi ${name},\n\nCongratulations! Your certificate for "${r.examTitle}" is attached.\n\nSerial: ${r.serialNo}\nAnyone can check it is genuine at:\n${r.verifyUrl}\n`,
+      html: layout(
+        'Your certificate is ready',
+        `<p>Hi ${esc(name)}, your certificate for <strong>${esc(r.examTitle)}</strong> is attached to this email.</p><p style="font-size:14px">Serial: <strong>${esc(r.serialNo)}</strong><br>Anyone can check it is genuine at <a href="${esc(r.verifyUrl)}">${esc(r.verifyUrl)}</a></p>`,
+      ),
+      attachments: [
+        {
+          filename: `certificate-${r.serialNo}.pdf`,
+          contentType: 'application/pdf',
+          content: r.pdf,
+        },
+      ],
+    });
+  }
+
   sendVerificationCode(to: string, name: string, code: string) {
     const minutes = this.env.OTP_TTL_MIN;
     return this.deliver({

@@ -41,6 +41,16 @@ npm run dev:worker
 
 Still open from Sprint 0: ESLint and commit hooks, design system and wireframes, production Terraform apply, working GitHub Actions (blocked by billing). See the plan file for full status.
 
+## Sprint 9: certificates (done locally)
+
+- **Two certificates:** students get a Certificate of Achievement (or Participation); the trainer gets a Certificate of Appreciation for conducting the exam. Samples of both are on the landing page (`apps/web/public/samples/`, regenerate with the renderer if the design changes).
+- **Trainer:** exam **Certificate** tab (layout, colour, wording, signatory, live PDF preview). When results are published, one certificate is made per eligible student (achievement at or above the pass mark, participation below).
+- **Admin:** `/admin/certificates` queue: preview, approve (per exam or selected), reject with a reason, resend. API under `/admin/certificates/*`.
+- **Students:** emailed the PDF after approval; download from the dashboard (`GET /certificates/mine`, `/certificates/:id/pdf`).
+- **Public:** `/verify/?serial=AIQ-XXXX-XXXX-XXXX` (`GET /verify/:serial`), no sign-in, no scores.
+- **Background jobs:** `CERT_JOBS_POLL=on|off` (make PDFs, send approved certificates).
+- **Bounces:** `POST /mail/ses-events?key=$SES_EVENTS_KEY` for AWS SNS; Terraform `ses_events_endpoint` creates the subscription.
+
 ## Sprint 8: money (done locally)
 
 - **Ledger:** every payment is booked in a balanced double-entry ledger (`EXTERNAL`, `PLATFORM`, `EXAMINER:<id>`, `PAYOUTS`). Join fee: 50% trainer, 50% NandiVex. Sponsored seats and publishing fees: all NandiVex.

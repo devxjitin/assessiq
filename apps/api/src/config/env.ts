@@ -26,6 +26,14 @@ const schema = z.object({
   JUDGE0_LIMIT_MODE: z.enum(['process', 'cgroup']).default('process'),
   // 'on' starts the background judge that grades queued coding answers.
   CODE_JUDGE_POLL: z.enum(['on', 'off']).default('on'),
+  // The public address printed on certificates (QR code and "Verify at" line) and in emails.
+  // Defaults to WEB_ORIGIN. Certificates outlive any one environment, so staging can point at
+  // the production address too.
+  VERIFY_BASE_URL: z.string().url().optional(),
+  // 'on' starts the background jobs that make certificate PDFs and email approved ones.
+  CERT_JOBS_POLL: z.enum(['on', 'off']).default('on'),
+  // Secret in the URL of the endpoint that receives mail bounce notices from AWS SNS.
+  SES_EVENTS_KEY: z.string().min(16).optional(),
   CODE_JUDGE_CONCURRENCY: z.coerce.number().int().min(1).max(32).default(4),
   AWS_REGION: z.string().default('ap-south-1'),
   // Private file storage (exam logos, later certificates). `memory` is for tests/local dev.

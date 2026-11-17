@@ -22,10 +22,10 @@ Legend: ✅ done · 🟡 partly done · ⬜ not started · ⛔ blocked
 | P1 Core MVP   | **S4** Join & take exam                            | ✅ Done, on staging                          | Join by code + fee, server-timed attempt, shuffle, autosave, strikes. 24 new tests.                                                                                       |
 | P1 Core MVP   | **S5** Grading & results                           | ✅ Done locally, not deployed                | Auto-marking, partial credit, written-answer marking, publish results, CSV. 36 new tests.                                                                                 |
 | P2            | **S6** Coding engine · **S7** Integrity            | S6, S7 ✅ done locally; S6 deployed, S7 not yet | S7: question pools, one device per attempt, integrity report, join-code limiter, copied-code check. 22 new tests. |
-| P3            | **S8** Ledger/payouts · S9 Certificates · S10 Practice | S8 ✅ done locally, not deployed; S9, S10 ⬜ | S8: ledger, earnings, manual payouts with UTR and statements, refunds, sponsored seats. 31 new tests. |
+| P3            | **S8** Ledger/payouts · **S9** Certificates · S10 Practice | S8 deployed; S9 ✅ done locally, not deployed; S10 ⬜ | S9: two certificates (student, trainer), designer, PDF with QR, admin approval, email, bounces, public verify, samples on the website. 25 new tests. |
 | P4            | S11 Admin & migration · S12 Launch                 | ⬜                                           |                                                                                                                                                                           |
 
-**Sprints done: 9 of 13 (S0 to S8; S3 runs on a fake payment provider until Razorpay test keys are added).** Overall, the identity layer and the whole deployment pipeline (to staging) are in place; trainers can build draft exams; payments, taking exams and certificates do not exist yet.
+**Sprints done: 10 of 13 (S0 to S9; S3 runs on a fake payment provider until Razorpay test keys are added).** Overall, the identity layer and the whole deployment pipeline (to staging) are in place; trainers can build draft exams; payments, taking exams and certificates do not exist yet.
 
 **What exists today:** a private-by-default API with login and roles, a web app with sign-up/sign-in/profile/admin user list, a Postgres database with migrations, AWS staging (VPC, EC2, RDS, S3, CloudFront, ECR, SES, IAM deploy role), HTTPS on both hostnames, and 99 passing automated tests.
 
@@ -48,7 +48,7 @@ Legend: ✅ done · 🟡 partly done · ⬜ not started · ⛔ blocked
 | Certificate approval    | The **NandiVex admin** approves certificates before they are released.                                                                                                                                                  |
 | Coding questions        | **Auto-graded** against hidden test cases in a sandbox (self-hosted Judge0) at launch.                                                                                                                                  |
 | Payments                | Razorpay (Orders, Checkout, Webhooks). All money lands in NandiVex's account; **the examiner's 50% is paid out manually** by NandiVex (no Razorpay Route).                                                              |
-| Domain                  | **`assessiq.nandivex.in`** (a subdomain of the company domain `nandivex.in`, DNS at GoDaddy). Hostnames: `app.` / `api.` for production, `app-staging.` / `api-staging.` for staging, all under `assessiq.nandivex.in`. |
+| Domain                  | **`assessiq.nandivex.in`** (a subdomain of the company domain `nandivex.in`, DNS at GoDaddy). Production: the platform is served at **`https://assessiq.nandivex.in`** itself and its API at `https://api.assessiq.nandivex.in`. Staging: `app-staging.` / `api-staging.` under the same domain. |
 
 ### Deviations from the original plan (decided while building)
 
@@ -339,7 +339,40 @@ Each sprint ends with a demo on `staging` and a short retro. "Done" means code r
 | **S4: Join & take exam** ✅  | Student exam engine | Join by code → ₹149 payment → enrollment; exam lobby; **server-timed attempt**, per-student shuffle, autosave, navigator/flagging, submit/auto-submit; ported anti-cheat with server-side event logging and strike decision           | Answers survive a page refresh/network drop; late submissions rejected; the API never returns correct answers |
 | **S5: Grading & results** ✅ | Results             | Auto-grade single/multi MCQ (all-or-nothing/partial), subjective grading screen with rubric and feedback, finalise results, student result page and scorecard, examiner dashboard (attempts, scores, violations), CSV export          | Grading math covered by unit tests; results hidden until finalised                                            |
 
-#### Sprint 8 completion report ✅ (built and tested locally, including a manual run of the screens; **not yet deployed**)
+#### Sprint 9 completion report ✅ (built and tested locally, including a manual run of the screens; **not yet deployed**)
+
+| Scope item | Status | Where / how |
+| --- | --- | --- |
+| Certificate designer | ✅ | Exam **Certificate** tab: classic or modern layout, five accent colours, optional heading and sentence, signatory name and title (the signature line), turn certificates off, give participation certificates or not. A **live PDF preview** redraws as the trainer edits, for both kinds. Locked once results are published |
+| Two logos | ✅ | The trainer's logo (exam logo, else the account logo) on one side and the NandiVex logo on the other, on every certificate |
+| PDF generation | ✅ | A4 landscape PDF made in code (`pdf-lib`): holder, exam, score, date, signature line, serial and a **QR code** to the verification page. Made in the background after results are published (not on demand), stored privately, regenerated if the file is ever missing. Checked by eye in both layouts |
+| **Two certificates** | ✅ | **Students** get a *Certificate of Achievement* (and optionally a participation one). **Trainers** get a *Certificate of Appreciation* for conducting an exam (one per exam, with the number of students who sat it, signed by NandiVex), made when results are published, approved in the same admin queue, emailed to the trainer, downloadable from their dashboard and publicly verifiable. A trainer can switch their own certificate off in the designer |
+| **Samples on the website** | ✅ | The landing page shows both sample certificates (images with a SAMPLE mark) with links to the sample PDFs and to the verify page. Made with the real renderer, so they always match what is issued (`apps/web/public/samples/`) |
+| Who gets one (Q3) | ✅ | *Certificate of Achievement* at or above the pass mark, *Certificate of Participation* below it (trainer can switch participation off or certificates off entirely) |
+| Admin approval queue | ✅ | **Certificates** page for NandiVex: exams with waiting/issued/rejected counts, **Approve all** for an exam, per-student **preview** of the real PDF, select several to approve or **reject with a reason**, tabs for waiting / emailed / sending / rejected. Nothing is emailed or downloadable before approval (tested) |
+| Email with PDF | ✅ | After approval a background job emails each student the PDF (raw MIME through SES, with a text fallback), 10 at a time, retrying failures with a growing pause up to 5 times. Students can also **download** from their dashboard once issued |
+| Bounce handling | ✅ in code, ⬜ not wired in AWS | `POST /mail/ses-events?key=...` receives SNS notices (bounce, complaint, delivery), stores them once, and flags the certificate so the admin sees "email bounced" and can resend. Terraform has the subscription (`ses_events_endpoint`, off by default); it is not applied |
+| Public verification | ✅ | `/verify/?serial=...` (no sign-in): genuine / withdrawn / not found, showing holder, certificate type, exam, trainer's organisation and date, **never** the score or email. Each certificate carries a signature (HMAC) of its printed facts; a record edited in the database no longer verifies. A rejected-after-issue certificate shows as withdrawn |
+| Resend | ✅ | Admin **Resend** for any issued certificate |
+| Tests | ✅ | **25 API tests** (template, creation rules, the trainer's certificate, approval gate, email retries, verification and tampering, bounces and raw email); repo total 235 regular tests |
+
+**Findings worth knowing:**
+
+- The PDF is drawn with `pdf-lib` and the built-in fonts, not Chromium (the plan's first idea). That keeps the server image small and fast, and the layout is exact, but the fonts only cover **Latin letters**: a name in another script (Hindi, Tamil) prints as `?`. Fixing this needs a bundled font per script.
+- The public verification page is a query-string page (`/verify/?serial=...`), not `/verify/<serial>`, because the web app is a static export.
+- Serial numbers are 12 random characters (60 bits), so they cannot be guessed one by one; the verify endpoint is also rate limited.
+- A student whose results are published but whose attempt ended by strikes still gets a certificate in the queue; the admin can reject it. There is no automatic rule for this.
+- Certificates are only made when the trainer publishes results *after this release*. Exams already finalized have none (staging has none yet).
+- The mail-events endpoint is protected by a secret in its URL (SNS cannot send a token). The SNS signature itself is not verified.
+
+**Acceptance criteria:** no certificate is emailed before admin approval ✅ (tested); the verification page shows the correct holder and exam ✅.
+
+**Known gaps after Sprint 9:**
+
+- Not deployed; the SNS subscription for bounces is not created; real SES delivery of attachments has not been run (staging SES is still in sandbox, so it can only email verified addresses).
+- Certificates only in Latin script; no LinkedIn sharing or custom per-trainer templates (later, per the plan).
+
+#### Sprint 8 completion report ✅ (deployed to staging on 2026-11-17)
 
 | Scope item | Status | Where / how |
 | --- | --- | --- |
@@ -582,7 +615,7 @@ Each sprint ends with a demo on `staging` and a short retro. "Done" means code r
 | Sprint                                       | Goal                            | Scope                                                                                                                                                                                                                                                                                                                                                         | Acceptance criteria                                                                                                                                                            |
 | -------------------------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **S8: Ledger, manual payouts & sponsorship** ✅ | Revenue tracking + trainer pays | **Double-entry ledger**, examiner earnings dashboard (accrued/payable/paid), examiner payout details (UPI/bank, encrypted), **admin payout screen** (payable list, minimum threshold, mark paid with UTR, payout statements), **sponsored seats** (bulk buy, CSV assign, redeem links), refunds flow (admin-initiated; reverses the examiner's accrued share) | For each ₹149 payment the ledger balances to the paisa; a refund reverses both shares; paying out creates a ledger entry and statement; sponsored students join without paying |
-| **S9: Certificates**                         | Approved certificates by email  | Certificate template designer (layout, two logos, signature line), PDF generation in worker, serial + QR, **NandiVex admin approval queue** (preview, bulk approve, reject with reason), SES email with attachment, bounce handling, public `/verify/<serial>` page, re-send option                                                                           | No certificate is emailed before admin approval; the verification page shows the correct holder and exam                                                                       |
+| **S9: Certificates** ✅                      | Approved certificates by email  | Certificate template designer (layout, two logos, signature line), PDF generation in worker, serial + QR, **NandiVex admin approval queue** (preview, bulk approve, reject with reason), SES email with attachment, bounce handling, public `/verify/<serial>` page, re-send option                                                                           | No certificate is emailed before admin approval; the verification page shows the correct holder and exam                                                                       |
 | **S10: Practice sets**                       | Post-exam practice              | Practice access unlock (attempted students only, after exam closes), practice mode UI with explanations and instant feedback, coding re-runs, practice history; student dashboard showing exams, results, practice and certificates                                                                                                                           | A student who didn't attempt can't open practice (API returns 403); practice never affects official scores                                                                     |
 
 ### Phase 4: Admin console, migration & launch (Sprints 11–12, weeks 23–26)

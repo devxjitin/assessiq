@@ -59,7 +59,60 @@ export default function HomePage() {
             <Icon name="shield" />
           </span>
           <h3>Verified certificates</h3>
-          <p>Passing students receive a certificate approved by NandiVex and delivered by email.</p>
+          <p>
+            Students receive a certificate of achievement and trainers a certificate of
+            appreciation, each approved by NandiVex and delivered by email.
+          </p>
+        </div>
+      </section>
+      <section className="samples" aria-labelledby="samples-title">
+        <h2 id="samples-title">Two certificates, both verifiable</h2>
+        <p className="muted">
+          Every certificate carries a serial number and a QR code. Anyone can check it on{' '}
+          <Link href="/verify/">assessiq.nandivex.in/verify</Link>.
+        </p>
+        <div className="sample-grid">
+          <figure className="sample">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/samples/certificate-student.png"
+              alt="Sample Certificate of Achievement awarded to a student, with the trainer's logo, the NandiVex logo, a signature line, a serial number and a QR code"
+              width={1400}
+              height={990}
+              loading="lazy"
+            />
+            <figcaption>
+              <h3>For students: Certificate of Achievement</h3>
+              <p>
+                Awarded when a student passes. Shows the student&apos;s name, the exam, the score
+                and the trainer&apos;s signature. Trainers can also give a participation certificate
+                to students below the pass mark.
+              </p>
+              <a href="/samples/certificate-student.pdf" target="_blank" rel="noopener">
+                Open sample (PDF)
+              </a>
+            </figcaption>
+          </figure>
+          <figure className="sample">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/samples/certificate-trainer.png"
+              alt="Sample Certificate of Appreciation awarded to a trainer for conducting an exam, signed by NandiVex, with a serial number and a QR code"
+              width={1400}
+              height={990}
+              loading="lazy"
+            />
+            <figcaption>
+              <h3>For trainers: Certificate of Appreciation</h3>
+              <p>
+                Awarded to the trainer for conducting an exam, with the number of students who sat
+                it. Signed by NandiVex Technologies.
+              </p>
+              <a href="/samples/certificate-trainer.pdf" target="_blank" rel="noopener">
+                Open sample (PDF)
+              </a>
+            </figcaption>
+          </figure>
         </div>
       </section>
     </Shell>

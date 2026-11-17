@@ -51,7 +51,9 @@ locals {
   azs     = slice(data.aws_availability_zones.available.names, 0, 2)
   is_prod = var.environment == "production"
 
-  # Subdomains: app.<domain> (web), api.<domain> (API), verify.<domain> (certificate check, same web app)
-  web_hostname = var.domain_name != "" ? "${var.environment == "production" ? "app" : "app-${var.environment}"}.${var.domain_name}" : ""
+  # Production: the platform itself lives at <domain> (assessiq.nandivex.in) and its API at api.<domain>.
+  # Other environments use app-<env>.<domain> and api-<env>.<domain>. Certificate checks are a page
+  # of the same web app (/verify/), so they need no hostname of their own.
+  web_hostname = var.domain_name == "" ? "" : (var.environment == "production" ? var.domain_name : "app-${var.environment}.${var.domain_name}")
   api_hostname = var.domain_name != "" ? "${var.environment == "production" ? "api" : "api-${var.environment}"}.${var.domain_name}" : ""
 }

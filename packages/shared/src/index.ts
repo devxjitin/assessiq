@@ -9,3 +9,4 @@ export * from './grading';
 export * from './coding';
 export * from './integrity';
 export * from './ledger';
+export * from './certificate';
