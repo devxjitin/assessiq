@@ -836,20 +836,40 @@ tbody tr:last-child td {
 /* ---------- structured forms ---------- */
 .form-layout {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
-  align-items: start;
+  align-items: stretch;
   margin-top: 0;
 }
 .form-full {
   grid-column: 1 / -1;
 }
-.form-side {
+.field-row {
   display: grid;
-  gap: 16px;
+  gap: 14px;
+  align-items: start;
+}
+.field-row-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.field-row-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: end;
+}
+.field-row .field input,
+.field-row .field textarea {
+  width: 100%;
+  min-width: 0;
+}
+@media (max-width: 640px) {
+  .field-row-2,
+  .field-row-3 {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 .form-section {
   display: grid;
+  align-content: start;
   gap: 14px;
   background: var(--surface);
   border: 1px solid var(--border);
@@ -876,6 +896,8 @@ tbody tr:last-child td {
 .form-actions {
   display: flex;
   justify-content: flex-end;
+  gap: 10px;
+  padding-top: 4px;
 }
 .two-eq {
   display: grid;

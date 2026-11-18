@@ -91,7 +91,7 @@ export function ExamSettingsForm({
         </div>
       )}
 
-      <section className="form-section">
+      <section className="form-section form-full">
         <h3>Basics</h3>
         <p className="card-sub">What students see before and during the exam.</p>
         <Field
@@ -101,26 +101,32 @@ export function ExamSettingsForm({
           error={errors.title}
           maxLength={150}
         />
-        <label className="field">
-          <span>Description (optional)</span>
-          <textarea name="description" defaultValue={initial?.description ?? ''} maxLength={2000} />
-          {errors.description && <small className="error-text">{errors.description}</small>}
-        </label>
-        <label className="field">
-          <span>Instructions shown to students (optional)</span>
-          <textarea
-            name="instructions"
-            defaultValue={initial?.instructions ?? ''}
-            maxLength={4000}
-          />
-          {errors.instructions && <small className="error-text">{errors.instructions}</small>}
-        </label>
+        <div className="field-row field-row-2">
+          <label className="field">
+            <span>Description (optional)</span>
+            <textarea
+              name="description"
+              defaultValue={initial?.description ?? ''}
+              maxLength={2000}
+            />
+            {errors.description && <small className="error-text">{errors.description}</small>}
+          </label>
+          <label className="field">
+            <span>Instructions shown to students (optional)</span>
+            <textarea
+              name="instructions"
+              defaultValue={initial?.instructions ?? ''}
+              maxLength={4000}
+            />
+            {errors.instructions && <small className="error-text">{errors.instructions}</small>}
+          </label>
+        </div>
       </section>
 
-      <div className="form-side">
-        <section className="form-section">
-          <h3>Schedule</h3>
-          <p className="card-sub">Both dates are needed before you publish.</p>
+      <section className="form-section">
+        <h3>Schedule</h3>
+        <p className="card-sub">Both dates are needed before you publish.</p>
+        <div className="field-row field-row-2">
           <Field
             label="Opens at"
             name="startsAt"
@@ -135,12 +141,15 @@ export function ExamSettingsForm({
             defaultValue={toLocalInput(initial?.endsAt)}
             error={errors.endsAt}
           />
-        </section>
+        </div>
+      </section>
 
-        <section className="form-section">
-          <h3>Limits and grading</h3>
+      <section className="form-section">
+        <h3>Limits and grading</h3>
+        <p className="card-sub">How long it runs and who can sit it.</p>
+        <div className="field-row field-row-3">
           <Field
-            label="Duration (minutes)"
+            label="Duration (min)"
             name="durationMinutes"
             type="number"
             min={5}
@@ -167,46 +176,47 @@ export function ExamSettingsForm({
             defaultValue={initial?.maxStudents ?? 1000}
             error={errors.maxStudents}
           />
-        </section>
+        </div>
+      </section>
 
-        <section className="form-section">
-          <h3>Question pool</h3>
-          <p className="card-sub">
-            Give every student a different random set of questions out of a bigger bank. Leave empty
-            to give everyone all questions. Use questions with the same marks so scores stay fair.
-          </p>
-          <Field
-            label="Questions per student"
-            name="questionsPerStudent"
-            type="number"
-            min={1}
-            max={300}
-            placeholder="All questions"
-            defaultValue={initial?.questionsPerStudent ?? ''}
-            error={errors.questionsPerStudent}
+      <section className="form-section">
+        <h3>Question pool</h3>
+        <p className="card-sub">
+          Give every student a different random set of questions out of a bigger bank. Leave empty
+          to give everyone all questions. Use questions with the same marks so scores stay fair.
+        </p>
+        <Field
+          label="Questions per student"
+          name="questionsPerStudent"
+          type="number"
+          min={1}
+          max={300}
+          placeholder="All questions"
+          defaultValue={initial?.questionsPerStudent ?? ''}
+          error={errors.questionsPerStudent}
+        />
+      </section>
+
+      <section className="form-section">
+        <h3>Shuffling</h3>
+        <p className="card-sub">Randomise what each student sees.</p>
+        <label className="check">
+          <input
+            type="checkbox"
+            name="shuffleQuestions"
+            defaultChecked={initial?.shuffleQuestions ?? true}
           />
-        </section>
-
-        <section className="form-section">
-          <h3>Shuffling</h3>
-          <label className="check">
-            <input
-              type="checkbox"
-              name="shuffleQuestions"
-              defaultChecked={initial?.shuffleQuestions ?? true}
-            />
-            Shuffle question order for each student
-          </label>
-          <label className="check">
-            <input
-              type="checkbox"
-              name="shuffleOptions"
-              defaultChecked={initial?.shuffleOptions ?? true}
-            />
-            Shuffle answer options
-          </label>
-        </section>
-      </div>
+          Shuffle question order for each student
+        </label>
+        <label className="check">
+          <input
+            type="checkbox"
+            name="shuffleOptions"
+            defaultChecked={initial?.shuffleOptions ?? true}
+          />
+          Shuffle answer options
+        </label>
+      </section>
 
       <div className="form-full form-actions">
         <Button type="submit" loading={busy}>
