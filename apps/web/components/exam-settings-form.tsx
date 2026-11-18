@@ -70,13 +70,24 @@ export function ExamSettingsForm({
     };
     const result = validate(initial ? updateExamFormSchema : createExamSchema, candidate);
     setSaved(false);
-    if (!result.ok) {
-      setErrors(result.errors);
+    // Early hints only. The API still accepts any window on a draft and enforces it at publish.
+    const hints: FieldErrors = {};
+    if (result.ok && !initial && candidate.endsAt) {
+      const end = new Date(candidate.endsAt).getTime();
+      const start = candidate.startsAt ? new Date(candidate.startsAt).getTime() : null;
+      if (end <= Date.now()) hints.endsAt = 'The closing time is already in the past';
+      else if (start !== null && end - start < candidate.durationMinutes * 60_000)
+        hints.endsAt = 'The window between opening and closing is shorter than the exam duration';
+    }
+    if (!result.ok || Object.keys(hints).length) {
+      const errs = result.ok ? hints : result.errors;
+      setErrors(errs);
       setMessage('Please fix the highlighted fields.');
-      const first = Object.keys(result.errors)[0];
+      const first = Object.keys(errs)[0];
       if (first) e.currentTarget.querySelector<HTMLElement>(`[name="${first}"]`)?.focus();
       return;
     }
+    if (!result.ok) return; // narrowed for TypeScript; handled above
     setErrors({});
     setMessage('');
     setBusy(true);

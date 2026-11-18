@@ -64,21 +64,7 @@ export const createExamSchema = z
     /** Decided once, when the exam is created. Off = no certificate tab, no certificates. */
     certificatesEnabled: z.boolean().default(true),
   })
-  .refine(windowIsValid, windowMessage)
-  .refine((v) => !v.endsAt || new Date(v.endsAt) > new Date(), {
-    message: 'The closing time is already in the past',
-    path: ['endsAt'],
-  })
-  .refine(
-    (v) =>
-      !v.startsAt ||
-      !v.endsAt ||
-      new Date(v.endsAt).getTime() - new Date(v.startsAt).getTime() >= v.durationMinutes * 60_000,
-    {
-      message: 'The window between opening and closing is shorter than the exam duration',
-      path: ['endsAt'],
-    },
-  );
+  .refine(windowIsValid, windowMessage);
 export type CreateExamInput = z.infer<typeof createExamSchema>;
 
 export const updateExamSchema = z
