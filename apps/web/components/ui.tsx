@@ -80,6 +80,23 @@ function AuthShell({ children }: { children: React.ReactNode }) {
             ))}
           </ul>
         </div>
+        <div className="auth-preview" aria-hidden="true">
+          <div className="auth-preview-head">
+            <b>Cloud Fundamentals</b>
+            <span className="auth-live">Live</span>
+          </div>
+          <div className="auth-bar">
+            <i />
+          </div>
+          <div className="auth-preview-row">
+            <span>Question 25 of 40</span>
+            <span>42:18 left</span>
+          </div>
+          <div className="auth-preview-row">
+            <span>Tab switches</span>
+            <span>0 of 3</span>
+          </div>
+        </div>
         <a className="auth-by" href="https://nandivex.in" target="_blank" rel="noreferrer">
           A product of NandiVex Technologies &middot; nandivex.in
         </a>
