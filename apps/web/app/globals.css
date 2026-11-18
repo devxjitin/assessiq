@@ -769,7 +769,9 @@ tbody tr:last-child td {
   height: 16px;
   border-radius: 50%;
   background: var(--muted);
-  transition: transform 0.15s, background 0.15s;
+  transition:
+    transform 0.15s,
+    background 0.15s;
 }
 .check.toggle input[type='checkbox']:checked {
   background: var(--primary);
