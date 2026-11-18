@@ -171,7 +171,7 @@ export function ExamSettingsForm({
       <section className="form-section">
         <h3>Shuffling</h3>
         <p className="card-sub">Randomise what each student sees.</p>
-        <label className="check">
+        <label className="check toggle">
           <input
             type="checkbox"
             name="shuffleQuestions"
@@ -179,7 +179,7 @@ export function ExamSettingsForm({
           />
           Shuffle question order for each student
         </label>
-        <label className="check">
+        <label className="check toggle">
           <input
             type="checkbox"
             name="shuffleOptions"
@@ -196,7 +196,7 @@ export function ExamSettingsForm({
             Decide now: students get a certificate when you publish results. You cannot change this
             later. If you turn it off, there is no certificate design step.
           </p>
-          <label className="check">
+          <label className="check toggle">
             <input type="checkbox" name="certificatesEnabled" defaultChecked />
             Give certificates for this exam
           </label>

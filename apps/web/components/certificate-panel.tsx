@@ -118,7 +118,7 @@ export function CertificatePanel({
 
       <div className="cert-designer">
         <div>
-          <label className="check">
+          <label className="check toggle">
             <input
               type="checkbox"
               checked={tpl.enabled}
@@ -127,7 +127,7 @@ export function CertificatePanel({
             />
             Give certificates for this exam
           </label>
-          <label className="check">
+          <label className="check toggle">
             <input
               type="checkbox"
               checked={tpl.trainerCertificate}
@@ -136,7 +136,7 @@ export function CertificatePanel({
             />
             Give <strong>me</strong> a Certificate of Appreciation for conducting this exam
           </label>
-          <label className="check">
+          <label className="check toggle">
             <input
               type="checkbox"
               checked={tpl.participation}
