@@ -5,14 +5,46 @@ import { LIMITS } from './constants';
 
 /** Settings a trainer controls on a draft exam. */
 const examSettings = {
-  title: z.string().trim().min(3).max(150),
-  description: z.string().trim().max(2000).optional().nullable(),
-  instructions: z.string().trim().max(4000).optional().nullable(),
-  durationMinutes: z.number().int().min(5).max(LIMITS.MAX_EXAM_DURATION_MINUTES),
+  title: z
+    .string({ message: 'Enter an exam title' })
+    .trim()
+    .min(3, 'The title needs at least 3 characters')
+    .max(150, 'The title can be at most 150 characters'),
+  description: z
+    .string()
+    .trim()
+    .max(2000, 'Keep the description under 2000 characters')
+    .optional()
+    .nullable(),
+  instructions: z
+    .string()
+    .trim()
+    .max(4000, 'Keep the instructions under 4000 characters')
+    .optional()
+    .nullable(),
+  durationMinutes: z
+    .number({ message: 'Enter the duration in minutes' })
+    .int('Duration must be a whole number of minutes')
+    .min(5, 'Duration must be at least 5 minutes')
+    .max(
+      LIMITS.MAX_EXAM_DURATION_MINUTES,
+      `Duration can be at most ${LIMITS.MAX_EXAM_DURATION_MINUTES} minutes`,
+    ),
   // The exam window. Both optional while drafting; required to publish (Sprint 3).
-  startsAt: z.string().datetime().optional().nullable(),
-  endsAt: z.string().datetime().optional().nullable(),
-  passPercent: z.number().min(0).max(100),
+  startsAt: z
+    .string()
+    .datetime({ message: 'Enter a valid opening date and time' })
+    .optional()
+    .nullable(),
+  endsAt: z
+    .string()
+    .datetime({ message: 'Enter a valid closing date and time' })
+    .optional()
+    .nullable(),
+  passPercent: z
+    .number({ message: 'Enter a pass mark between 0 and 100' })
+    .min(0, 'Pass mark cannot be below 0%')
+    .max(100, 'Pass mark cannot be above 100%'),
   shuffleQuestions: z.boolean(),
   shuffleOptions: z.boolean(),
 };
@@ -32,7 +64,21 @@ export const createExamSchema = z
     /** Decided once, when the exam is created. Off = no certificate tab, no certificates. */
     certificatesEnabled: z.boolean().default(true),
   })
-  .refine(windowIsValid, windowMessage);
+  .refine(windowIsValid, windowMessage)
+  .refine((v) => !v.endsAt || new Date(v.endsAt) > new Date(), {
+    message: 'The closing time is already in the past',
+    path: ['endsAt'],
+  })
+  .refine(
+    (v) =>
+      !v.startsAt ||
+      !v.endsAt ||
+      new Date(v.endsAt).getTime() - new Date(v.startsAt).getTime() >= v.durationMinutes * 60_000,
+    {
+      message: 'The window between opening and closing is shorter than the exam duration',
+      path: ['endsAt'],
+    },
+  );
 export type CreateExamInput = z.infer<typeof createExamSchema>;
 
 export const updateExamSchema = z

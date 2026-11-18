@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { createExamSchema, type ExamDetailDto } from '@assessiq/shared';
+import { createExamSchema, updateExamSchema, type ExamDetailDto } from '@assessiq/shared';
 import { Alert, Button, Field, FieldErrors, describeError, validate } from './ui';
 
 /** ISO string -> value for <input type="datetime-local"> in the viewer's time zone. */
@@ -12,7 +12,19 @@ function toLocalInput(iso: string | null | undefined): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-const toIso = (local: string): string | null => (local ? new Date(local).toISOString() : null);
+const toIso = (local: string): string | null => {
+  if (!local) return null;
+  const d = new Date(local);
+  return Number.isNaN(d.getTime()) ? local : d.toISOString(); // bad input fails validation
+};
+
+/** Blank number inputs become NaN so the schema reports them instead of treating them as 0. */
+const toNumber = (v: FormDataEntryValue | null): number =>
+  v === null || String(v).trim() === '' ? Number.NaN : Number(v);
+
+// Editing an existing exam keeps the original rules (no "already in the past" check on a
+// running or finished exam); every setting is still required in the form.
+const updateExamFormSchema = updateExamSchema;
 
 export interface ExamSettingsValues {
   title: string;
@@ -48,19 +60,21 @@ export function ExamSettingsForm({
       title: String(f.get('title') ?? ''),
       description: String(f.get('description') ?? '') || null,
       instructions: String(f.get('instructions') ?? '') || null,
-      durationMinutes: Number(f.get('durationMinutes')),
+      durationMinutes: toNumber(f.get('durationMinutes')),
       startsAt: toIso(String(f.get('startsAt') ?? '')),
       endsAt: toIso(String(f.get('endsAt') ?? '')),
-      passPercent: Number(f.get('passPercent')),
+      passPercent: toNumber(f.get('passPercent')),
       shuffleQuestions: f.get('shuffleQuestions') === 'on',
       shuffleOptions: f.get('shuffleOptions') === 'on',
       certificatesEnabled: f.get('certificatesEnabled') === 'on',
     };
-    const result = validate(createExamSchema, candidate);
+    const result = validate(initial ? updateExamFormSchema : createExamSchema, candidate);
     setSaved(false);
     if (!result.ok) {
       setErrors(result.errors);
-      setMessage('');
+      setMessage('Please fix the highlighted fields.');
+      const first = Object.keys(result.errors)[0];
+      if (first) e.currentTarget.querySelector<HTMLElement>(`[name="${first}"]`)?.focus();
       return;
     }
     setErrors({});
@@ -68,8 +82,12 @@ export function ExamSettingsForm({
     setBusy(true);
     try {
       // The certificate choice is only made at creation.
-      const { certificatesEnabled, ...rest } = result.data;
-      await onSubmit((initial ? rest : { ...rest, certificatesEnabled }) as ExamSettingsValues);
+      const { certificatesEnabled: _ignored, ...rest } = result.data as ExamSettingsValues;
+      await onSubmit(
+        (initial
+          ? rest
+          : { ...rest, certificatesEnabled: candidate.certificatesEnabled }) as ExamSettingsValues,
+      );
       setSaved(true);
     } catch (err) {
       const d = describeError(err);
@@ -81,7 +99,15 @@ export function ExamSettingsForm({
   }
 
   return (
-    <form className="form-layout" onSubmit={submit} noValidate>
+    <form
+      className="form-layout"
+      onSubmit={submit}
+      onChange={(e) => {
+        const name = (e.target as unknown as HTMLInputElement).name;
+        if (name && errors[name]) setErrors(({ [name]: _gone, ...rest }) => rest);
+      }}
+      noValidate
+    >
       {(message || saved) && (
         <div className="form-full">
           {message && <Alert>{message}</Alert>}
