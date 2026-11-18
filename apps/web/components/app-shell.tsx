@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { useAuth } from '../lib/auth';
 import { Icon, type IconName } from './icons';
 
@@ -35,15 +36,49 @@ export function ThemeToggle() {
     setTheme(document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light');
   }, []);
 
-  function toggle() {
+  function toggle(e: React.MouseEvent<HTMLButtonElement>) {
     const next: Theme = theme === 'dark' ? 'light' : 'dark';
-    setTheme(next);
-    document.documentElement.dataset.theme = next;
-    try {
-      localStorage.setItem('aiq-theme', next);
-    } catch {
-      // storage blocked: the choice just lasts for this visit
+    const apply = () => {
+      setTheme(next);
+      document.documentElement.dataset.theme = next;
+      try {
+        localStorage.setItem('aiq-theme', next);
+      } catch {
+        // storage blocked: the choice just lasts for this visit
+      }
+    };
+    const root = document.documentElement;
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const start = (
+      document as Document & { startViewTransition?: (cb: () => void) => { ready: Promise<void> } }
+    ).startViewTransition;
+    if (reduce) {
+      apply();
+      return;
     }
+    if (!start) {
+      // No View Transitions: fade the colours instead.
+      root.classList.add('theme-fade');
+      apply();
+      window.setTimeout(() => root.classList.remove('theme-fade'), 500);
+      return;
+    }
+    // A circle grows out of the button and repaints the page in the new theme.
+    const box = e.currentTarget.getBoundingClientRect();
+    const x = box.left + box.width / 2;
+    const y = box.top + box.height / 2;
+    const radius = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
+    const transition = start.call(document, () => flushSync(apply));
+    transition.ready.then(() => {
+      root.animate(
+        { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${radius}px at ${x}px ${y}px)`] },
+        {
+          duration: 700,
+          easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+          pseudoElement: '::view-transition-new(root)',
+        },
+      );
+    });
   }
 
   return (
@@ -54,7 +89,9 @@ export function ThemeToggle() {
       aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
       title={theme === 'dark' ? 'Light theme' : 'Dark theme'}
     >
-      <Icon name={theme === 'dark' ? 'moon' : 'sun'} />
+      <span className="theme-icon" key={theme}>
+        <Icon name={theme === 'dark' ? 'moon' : 'sun'} />
+      </span>
     </button>
   );
 }
