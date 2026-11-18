@@ -72,7 +72,11 @@ export function ExamSettingsForm({
     setSaved(false);
     // Early hints only. The API still accepts any window on a draft and enforces it at publish.
     const hints: FieldErrors = {};
-    if (result.ok && !initial && candidate.endsAt) {
+    if (result.ok && !initial) {
+      if (!candidate.startsAt) hints.startsAt = 'Choose when the exam opens';
+      if (!candidate.endsAt) hints.endsAt = 'Choose when the exam closes';
+    }
+    if (result.ok && !initial && candidate.endsAt && !hints.endsAt) {
       const end = new Date(candidate.endsAt).getTime();
       const start = candidate.startsAt ? new Date(candidate.startsAt).getTime() : null;
       if (end <= Date.now()) hints.endsAt = 'The closing time is already in the past';
@@ -160,7 +164,7 @@ export function ExamSettingsForm({
 
       <section className="form-section">
         <h3>Schedule</h3>
-        <p className="card-sub">Both dates are needed before you publish.</p>
+        <p className="card-sub">Both dates are required.</p>
         <div className="field-row field-row-2">
           <Field
             label="Opens at"
