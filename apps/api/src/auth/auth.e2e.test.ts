@@ -202,7 +202,11 @@ describe('login', () => {
   it("locks one email+IP pair, not the owner's account, and clears when the owner signs in elsewhere", async () => {
     const { email } = await signUp(ctx);
     for (let i = 0; i < 5; i++) {
-      await ctx.http().post('/auth/login').send({ email, password: 'Wrong-password-1' }).expect(401);
+      await ctx
+        .http()
+        .post('/auth/login')
+        .send({ email, password: 'Wrong-password-1' })
+        .expect(401);
     }
     await ctx.http().post('/auth/login').send({ email, password: PASSWORD }).expect(429);
     const user = await ctx.prisma.user.findUnique({ where: { email } });
@@ -214,19 +218,34 @@ describe('login', () => {
 
   it('cleans up stale failure rows and week-old unverified sign-ups, keeping paid or fresh ones', async () => {
     const cleanup = ctx.app.get(AuthCleanupService);
-    await ctx.http().post('/auth/register').send({ name: 'Old', email: 'old@example.com', password: PASSWORD, role: 'STUDENT' }).expect(202);
-    await ctx.http().post('/auth/register').send({ name: 'New', email: 'fresh@example.com', password: PASSWORD, role: 'STUDENT' }).expect(202);
+    await ctx
+      .http()
+      .post('/auth/register')
+      .send({ name: 'Old', email: 'old@example.com', password: PASSWORD, role: 'STUDENT' })
+      .expect(202);
+    await ctx
+      .http()
+      .post('/auth/register')
+      .send({ name: 'New', email: 'fresh@example.com', password: PASSWORD, role: 'STUDENT' })
+      .expect(202);
     await ctx.prisma.user.update({
       where: { email: 'old@example.com' },
       data: { createdAt: new Date(Date.now() - 8 * 86_400_000) },
     });
     await ctx.prisma.loginFailure.create({
-      data: { email: 'x@example.com', ip: '1.1.1.1', count: 1, updatedAt: new Date(Date.now() - 2 * 86_400_000) },
+      data: {
+        email: 'x@example.com',
+        ip: '1.1.1.1',
+        count: 1,
+        updatedAt: new Date(Date.now() - 2 * 86_400_000),
+      },
     });
     const res = await cleanup.runOnce();
     expect(res.users).toBe(1);
     expect(await ctx.prisma.user.findUnique({ where: { email: 'old@example.com' } })).toBeNull();
-    expect(await ctx.prisma.user.findUnique({ where: { email: 'fresh@example.com' } })).not.toBeNull();
+    expect(
+      await ctx.prisma.user.findUnique({ where: { email: 'fresh@example.com' } }),
+    ).not.toBeNull();
   });
 
   it('normalises email case', async () => {

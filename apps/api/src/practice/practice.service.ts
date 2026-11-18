@@ -56,9 +56,7 @@ export class PracticeService {
   private isOver(exam: Pick<Exam, 'status' | 'endsAt'>): boolean {
     if (OVER.includes(exam.status)) return true;
     return (
-      exam.status === 'PUBLISHED' &&
-      exam.endsAt !== null &&
-      exam.endsAt.getTime() <= Date.now()
+      exam.status === 'PUBLISHED' && exam.endsAt !== null && exam.endsAt.getTime() <= Date.now()
     );
   }
 

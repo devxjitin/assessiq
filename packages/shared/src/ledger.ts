@@ -275,10 +275,6 @@ export interface SeatPreviewDto {
 }
 
 export const reassignSeatSchema = z.object({
-  email: z
-    .string()
-    .trim()
-    .toLowerCase()
-    .email('Enter a valid email address'),
+  email: z.string().trim().toLowerCase().email('Enter a valid email address'),
 });
 export type ReassignSeatInput = z.infer<typeof reassignSeatSchema>;

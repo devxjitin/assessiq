@@ -36,6 +36,8 @@ describe('production guards', () => {
     expect(() => loadEnv({ ...prod, ...over })).toThrow(/Unsafe production/);
   });
   it('lets staging opt in to fake payments', () => {
-    expect(() => loadEnv({ ...prod, PAYMENT_PROVIDER: 'fake', ALLOW_FAKE_PAYMENTS: 'true' })).not.toThrow();
+    expect(() =>
+      loadEnv({ ...prod, PAYMENT_PROVIDER: 'fake', ALLOW_FAKE_PAYMENTS: 'true' }),
+    ).not.toThrow();
   });
 });
