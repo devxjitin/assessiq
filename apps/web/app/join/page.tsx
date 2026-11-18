@@ -21,7 +21,6 @@ const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString() : 'no
 const STATE_TEXT: Record<string, string> = {
   NOT_STARTED: 'You can join now and start when the exam opens.',
   ENDED: 'This exam has ended and can no longer be joined.',
-  FULL: 'This exam is full.',
   ALREADY_ENROLLED: 'You have already joined this exam.',
 };
 

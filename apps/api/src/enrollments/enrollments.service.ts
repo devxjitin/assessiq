@@ -4,7 +4,6 @@ import { AuditService } from '../audit/audit.service';
 import type { AuthUser } from '../common/decorators';
 import { SettingsService } from '../settings/settings.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { outstandingSeats } from '../seats/capacity';
 import { computeJoinState, normalizeCode } from './join-state';
 
 @Injectable()
@@ -36,7 +35,6 @@ export class EnrollmentsService {
       include: {
         questions: { select: { marks: true } },
         examiner: { select: { name: true, examinerProfile: { select: { orgName: true } } } },
-        _count: { select: { enrollments: true } },
       },
     });
     if (!exam || exam.status !== 'PUBLISHED') {
@@ -47,9 +45,6 @@ export class EnrollmentsService {
       where: { examId_studentId: { examId: exam.id, studentId: user.id } },
     });
     const total = exam.questions.reduce((s, q) => s + q.marks, 0);
-    const shown = exam.questionsPerStudent
-      ? Math.min(exam.questionsPerStudent, exam.questions.length)
-      : exam.questions.length;
     return {
       examId: exam.id,
       code: exam.code!,
@@ -60,14 +55,12 @@ export class EnrollmentsService {
       durationMinutes: exam.durationMinutes,
       startsAt: exam.startsAt?.toISOString() ?? null,
       endsAt: exam.endsAt?.toISOString() ?? null,
-      questionCount: shown,
-      totalMarks: Math.round((total / Math.max(1, exam.questions.length)) * shown * 100) / 100,
+      questionCount: exam.questions.length,
+      totalMarks: Math.round(total * 100) / 100,
       feePaise: (await this.settings.get()).examJoinPaise,
       state: computeJoinState({
         startsAt: exam.startsAt,
         endsAt: exam.endsAt,
-        maxStudents: exam.maxStudents,
-        seatsTaken: exam._count.enrollments + (await outstandingSeats(this.prisma, exam.id)),
         alreadyEnrolled: Boolean(enrolled),
       }),
     };

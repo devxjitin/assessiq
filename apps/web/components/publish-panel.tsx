@@ -183,7 +183,7 @@ export function PublishPanel({
           </li>
         ))}
       </ul>
-      {!exam.hasLogo && (
+      {exam.certificatesEnabled && !exam.hasLogo && (
         <p className="muted">
           Optional: add a logo in the Logo tab so it appears on your students&apos; certificates.
         </p>

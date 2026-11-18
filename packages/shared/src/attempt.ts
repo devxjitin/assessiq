@@ -40,7 +40,7 @@ export const STRIKE_EVENTS: readonly ProctorEventType[] = [
 export const proctorEventSchema = z.object({ type: z.enum(PROCTOR_EVENTS) });
 export type ProctorEventInput = z.infer<typeof proctorEventSchema>;
 
-export type JoinState = 'OPEN' | 'NOT_STARTED' | 'ENDED' | 'FULL' | 'ALREADY_ENROLLED';
+export type JoinState = 'OPEN' | 'NOT_STARTED' | 'ENDED' | 'ALREADY_ENROLLED';
 
 export interface JoinInfoDto {
   examId: string;

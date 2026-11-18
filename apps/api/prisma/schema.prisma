@@ -121,9 +121,6 @@ model Exam {
   passPercent         Float      @default(40)
   shuffleQuestions    Boolean    @default(true)
   shuffleOptions      Boolean    @default(true)
-  // Question pool: each student gets this many random questions out of all of them (null = all).
-  questionsPerStudent Int?
-  maxStudents         Int        @default(1000)
   // Certificate logo for this exam (private S3 key). Falls back to the trainer's default logo.
   logoKey             String?
   // Certificate settings (layout, colours, wording); null means the defaults.

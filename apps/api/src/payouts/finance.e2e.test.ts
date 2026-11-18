@@ -294,32 +294,6 @@ describe('refunds', () => {
     expect((await ledger()).totalPaise).toBe(0);
   });
 
-  it('refunding an unseated payment (exam full) only touches the platform', async () => {
-    await ctx.prisma.exam.update({ where: { id: exam.examId }, data: { maxStudents: 1 } });
-    const s1 = await newStudent(ctx, 'one@example.com');
-    const s2 = await newStudent(ctx, 'two@example.com');
-    const order = (await post(s1, `/join/${exam.code}/order`).expect(200)).body;
-    const order2 = (await post(s2, `/join/${exam.code}/order`).expect(200)).body;
-    for (const [s, o] of [
-      [s1, order],
-      [s2, order2],
-    ] as const) {
-      const paid = (await post(s, '/payments/fake/complete', { orderId: o.orderId }).expect(200))
-        .body;
-      await ctx.http().post('/payments/verify').set(auth(s)).send(paid);
-    }
-    const orphan = await ctx.prisma.payment.findFirstOrThrow({
-      where: { user: { email: 'two@example.com' }, status: 'CAPTURED' },
-    });
-    expect(await ctx.prisma.enrollment.count({ where: { paymentId: orphan.id } })).toBe(0);
-    const before = await ledger();
-    await refund(orphan.id).expect(200);
-    const after = await ledger();
-    expect(after.totalPaise).toBe(0);
-    expect(after.owedToTrainersPaise).toBe(before.owedToTrainersPaise);
-    expect(after.platformPaise).toBe(before.platformPaise - 14_900);
-  });
-
   it('lists payments for the admin and can filter them', async () => {
     await joinPayment('a@example.com');
     const all = (await get(admin, '/admin/finance/payments').expect(200)).body;
@@ -372,18 +346,6 @@ describe('sponsored seats', () => {
       await post(trainer, '/exams', { title: 'Draft exam', durationMinutes: 30 }).expect(201)
     ).body;
     await post(trainer, `/exams/${draft.id}/seats/order`, { seats: 1 }).expect(409);
-  });
-
-  it('counts unused seats against the exam capacity, for sponsors and for paying students', async () => {
-    await ctx.prisma.exam.update({ where: { id: exam.examId }, data: { maxStudents: 3 } });
-    await buy(2);
-    await post(trainer, `/exams/${exam.examId}/seats/order`, { seats: 2 }).expect(409);
-    const a = await newStudent(ctx, 'a@example.com');
-    await joinExam(ctx, a, exam.code); // the last free place
-    const b = await newStudent(ctx, 'b@example.com');
-    const info = (await get(b, `/join/${exam.code}`).expect(200)).body;
-    expect(info.state).toBe('FULL');
-    await post(b, `/join/${exam.code}/order`).expect(409);
   });
 
   it('assigns seats by email, emails the link, and only that student can use it', async () => {

@@ -46,7 +46,7 @@ describe('looking up a code', () => {
     expect(JSON.stringify(res.body)).not.toContain('correctOptions');
   });
 
-  it('reports NOT_STARTED, ENDED and FULL', async () => {
+  it('reports NOT_STARTED and ENDED', async () => {
     const soon = new Date(Date.now() + 3_600_000).toISOString();
     const later = new Date(Date.now() + 7_200_000).toISOString();
     const future = await publishExam(ctx, trainer, { startsAt: soon, endsAt: later });
@@ -62,13 +62,6 @@ describe('looking up a code', () => {
     expect(
       (await ctx.http().get(`/join/${ended.code}`).set(auth(sam)).expect(200)).body.state,
     ).toBe('ENDED');
-
-    const tiny = await publishExam(ctx, trainer, { maxStudents: 1 });
-    await joinExam(ctx, sam, tiny.code);
-    const other = await newStudent(ctx, 'other@example.com');
-    expect(
-      (await ctx.http().get(`/join/${tiny.code}`).set(auth(other)).expect(200)).body.state,
-    ).toBe('FULL');
   });
 });
 
@@ -125,40 +118,6 @@ describe('joining', () => {
       .set(auth(other))
       .send({ orderId: order.orderId })
       .expect(404);
-  });
-
-  it('flags for refund when the last seat is taken between order and payment', async () => {
-    const { code } = await publishExam(ctx, trainer, { maxStudents: 1 });
-    const other = await newStudent(ctx, 'other@example.com');
-    // Both start paying while a seat is free...
-    const sOrder = (await ctx.http().post(`/join/${code}/order`).set(auth(sam)).expect(200)).body;
-    const oOrder = (await ctx.http().post(`/join/${code}/order`).set(auth(other)).expect(200)).body;
-    const pay = async (who: { accessToken: string }, orderId: string) =>
-      (
-        await ctx
-          .http()
-          .post('/payments/fake/complete')
-          .set(auth(who))
-          .send({ orderId })
-          .expect(200)
-      ).body;
-    // ...Sam finishes first, so the other student's paid order has no seat.
-    await ctx
-      .http()
-      .post('/payments/verify')
-      .set(auth(sam))
-      .send(await pay(sam, sOrder.orderId))
-      .expect(200);
-    await ctx
-      .http()
-      .post('/payments/verify')
-      .set(auth(other))
-      .send(await pay(other, oOrder.orderId))
-      .expect(409);
-
-    expect(await ctx.prisma.enrollment.count()).toBe(1);
-    const orphan = await ctx.prisma.auditLog.findFirst({ where: { action: 'payment.orphan' } });
-    expect(orphan?.meta).toMatchObject({ reason: 'FULL' });
   });
 
   it('also enrolls from a webhook when the browser never reports back', async () => {

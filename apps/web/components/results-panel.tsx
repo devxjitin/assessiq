@@ -229,12 +229,6 @@ export function ResultsPanel({
       </div>
 
       {error && <Alert>{error}</Alert>}
-      {data.exam.questionsPerStudent && (
-        <Alert kind="info">
-          Question pool: each student gets {data.exam.questionsPerStudent} random questions, so
-          totals shown here are for a typical student.
-        </Alert>
-      )}
       {data.finalized ? (
         <Alert kind="success">Results are published. Students can see their scores.</Alert>
       ) : stats.pendingGrading > 0 ? (

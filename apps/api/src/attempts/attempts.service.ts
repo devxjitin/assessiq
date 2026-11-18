@@ -79,15 +79,11 @@ export class AttemptsService {
     const byDuration = new Date(now.getTime() + exam.durationMinutes * 60_000);
     const deadlineAt = exam.endsAt && exam.endsAt < byDuration ? exam.endsAt : byDuration;
 
-    // Question pool: each student gets a random N of the exam's questions.
-    const all = exam.questions.map((q) => q.id);
-    const pool = exam.questionsPerStudent;
-    const chosen = pool && pool < all.length ? new Set(shuffled(all).slice(0, pool)) : null;
-    const ids = chosen ? all.filter((id) => chosen.has(id)) : all;
+    // Every student gets the same paper; only the order may differ.
+    const ids = exam.questions.map((q) => q.id);
     const questionOrder = exam.shuffleQuestions ? shuffled(ids) : ids;
     const optionOrders: Record<string, number[]> = {};
     for (const q of exam.questions) {
-      if (chosen && !chosen.has(q.id)) continue;
       if (q.type === 'SINGLE' || q.type === 'MULTI') {
         const idx = q.options.map((_, i) => i);
         optionOrders[q.id] = exam.shuffleOptions ? shuffled(idx) : idx;

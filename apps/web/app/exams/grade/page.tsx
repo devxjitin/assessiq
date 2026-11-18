@@ -294,11 +294,6 @@ export default function GradePage() {
             </>
           )}
         </dl>
-        {data.pooled && (
-          <p className="muted">
-            This exam uses a question pool: only this student's questions are shown.
-          </p>
-        )}
         <h3>Timeline</h3>
         <p className="muted">
           Reported by the student's browser and the server. Advisory, not proof of anything.

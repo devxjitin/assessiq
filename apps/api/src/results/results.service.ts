@@ -135,7 +135,6 @@ export class ResultsService {
         status: exam.status,
         passPercent: exam.passPercent,
         totalMarks: this.totalFor(exam),
-        questionsPerStudent: exam.questionsPerStudent,
         enrolled,
       },
       stats: {
@@ -219,7 +218,6 @@ export class ResultsService {
         ip: e.ip,
       })),
       integrity,
-      pooled: asked.length < exam.questions.length,
       finalized: exam.status === 'RESULTS_FINAL',
       result:
         attempt.score !== null
@@ -364,12 +362,9 @@ export class ResultsService {
     return this.results(user, examId);
   }
 
-  /** Total marks shown for the exam; with a question pool this is the typical total per student. */
-  private totalFor(exam: { questions: { marks: number }[]; questionsPerStudent: number | null }) {
-    const total = exam.questions.reduce((s, q) => s + q.marks, 0);
-    const n = exam.questions.length;
-    const shown = exam.questionsPerStudent ? Math.min(exam.questionsPerStudent, n) : n;
-    return round2(n ? (total / n) * shown : 0);
+  /** Total marks for the exam. */
+  private totalFor(exam: { questions: { marks: number }[] }) {
+    return round2(exam.questions.reduce((s, q) => s + q.marks, 0));
   }
 
   /** Lets a student continue a running attempt from a different device. */

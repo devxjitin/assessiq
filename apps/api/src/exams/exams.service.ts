@@ -8,6 +8,8 @@ import {
 import { Exam, Prisma, Question } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import {
+  DEFAULT_CERT_TEMPLATE,
+  certificateTemplateSchema,
   LIMITS,
   toStudentCoding,
   type CodingSpec,
@@ -67,8 +69,10 @@ export class ExamsService {
         passPercent: input.passPercent,
         shuffleQuestions: input.shuffleQuestions,
         shuffleOptions: input.shuffleOptions,
-        maxStudents: input.maxStudents,
-        questionsPerStudent: input.questionsPerStudent,
+        certificate: {
+          ...DEFAULT_CERT_TEMPLATE,
+          enabled: input.certificatesEnabled,
+        } as unknown as Prisma.InputJsonValue,
       },
       include: { questions: true },
     });
@@ -136,8 +140,6 @@ export class ExamsService {
         passPercent: input.passPercent,
         shuffleQuestions: input.shuffleQuestions,
         shuffleOptions: input.shuffleOptions,
-        maxStudents: input.maxStudents,
-        questionsPerStudent: input.questionsPerStudent,
       },
       include: { questions: { orderBy: { position: 'asc' } } },
     });
@@ -482,8 +484,8 @@ export class ExamsService {
       passPercent: exam.passPercent,
       shuffleQuestions: exam.shuffleQuestions,
       shuffleOptions: exam.shuffleOptions,
-      maxStudents: exam.maxStudents,
-      questionsPerStudent: exam.questionsPerStudent,
+      certificatesEnabled: certificateTemplateSchema.safeParse(exam.certificate ?? {}).data
+        ?.enabled ?? true,
       hasLogo: Boolean(exam.logoKey),
       code: exam.code,
       publishedAt: exam.publishedAt?.toISOString() ?? null,

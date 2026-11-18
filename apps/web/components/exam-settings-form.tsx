@@ -24,8 +24,7 @@ export interface ExamSettingsValues {
   passPercent: number;
   shuffleQuestions: boolean;
   shuffleOptions: boolean;
-  maxStudents: number;
-  questionsPerStudent: number | null;
+  certificatesEnabled?: boolean;
 }
 
 export function ExamSettingsForm({
@@ -55,10 +54,7 @@ export function ExamSettingsForm({
       passPercent: Number(f.get('passPercent')),
       shuffleQuestions: f.get('shuffleQuestions') === 'on',
       shuffleOptions: f.get('shuffleOptions') === 'on',
-      maxStudents: Number(f.get('maxStudents')),
-      questionsPerStudent: String(f.get('questionsPerStudent') ?? '').trim()
-        ? Number(f.get('questionsPerStudent'))
-        : null,
+      certificatesEnabled: f.get('certificatesEnabled') === 'on',
     };
     const result = validate(createExamSchema, candidate);
     setSaved(false);
@@ -71,7 +67,9 @@ export function ExamSettingsForm({
     setMessage('');
     setBusy(true);
     try {
-      await onSubmit(result.data as ExamSettingsValues);
+      // The certificate choice is only made at creation.
+      const { certificatesEnabled, ...rest } = result.data;
+      await onSubmit((initial ? rest : { ...rest, certificatesEnabled }) as ExamSettingsValues);
       setSaved(true);
     } catch (err) {
       const d = describeError(err);
@@ -167,34 +165,7 @@ export function ExamSettingsForm({
             defaultValue={initial?.passPercent ?? 40}
             error={errors.passPercent}
           />
-          <Field
-            label="Max students"
-            name="maxStudents"
-            type="number"
-            min={1}
-            max={1000}
-            defaultValue={initial?.maxStudents ?? 1000}
-            error={errors.maxStudents}
-          />
         </div>
-      </section>
-
-      <section className="form-section">
-        <h3>Question pool</h3>
-        <p className="card-sub">
-          Give every student a different random set of questions out of a bigger bank. Leave empty
-          to give everyone all questions. Use questions with the same marks so scores stay fair.
-        </p>
-        <Field
-          label="Questions per student"
-          name="questionsPerStudent"
-          type="number"
-          min={1}
-          max={300}
-          placeholder="All questions"
-          defaultValue={initial?.questionsPerStudent ?? ''}
-          error={errors.questionsPerStudent}
-        />
       </section>
 
       <section className="form-section">
@@ -217,6 +188,20 @@ export function ExamSettingsForm({
           Shuffle answer options
         </label>
       </section>
+
+      {!initial && (
+        <section className="form-section">
+          <h3>Certificates</h3>
+          <p className="card-sub">
+            Decide now: students get a certificate when you publish results. You cannot change this
+            later. If you turn it off, there is no certificate design step.
+          </p>
+          <label className="check">
+            <input type="checkbox" name="certificatesEnabled" defaultChecked />
+            Give certificates for this exam
+          </label>
+        </section>
+      )}
 
       <div className="form-full form-actions">
         <Button type="submit" loading={busy}>

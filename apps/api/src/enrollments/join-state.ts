@@ -4,15 +4,12 @@ import type { JoinState } from '@assessiq/shared';
 export function computeJoinState(input: {
   startsAt: Date | null;
   endsAt: Date | null;
-  maxStudents: number;
-  seatsTaken: number;
   alreadyEnrolled: boolean;
   now?: Date;
 }): JoinState {
   const now = input.now ?? new Date();
   if (input.alreadyEnrolled) return 'ALREADY_ENROLLED';
   if (input.endsAt && input.endsAt <= now) return 'ENDED';
-  if (input.seatsTaken >= input.maxStudents) return 'FULL';
   // Joining stays open until the exam closes; starting is what the window gates.
   return input.startsAt && input.startsAt > now ? 'NOT_STARTED' : 'OPEN';
 }

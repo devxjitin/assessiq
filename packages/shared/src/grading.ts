@@ -100,8 +100,6 @@ export interface ExamResultsDto {
     status: string;
     passPercent: number;
     totalMarks: number;
-    /** Question pool size per student, when the exam uses one. */
-    questionsPerStudent: number | null;
     enrolled: number;
   };
   stats: {
@@ -148,8 +146,6 @@ export interface GradingAttemptDto {
   strikes: number;
   events: { type: string; strike: boolean; at: string; ip: string | null }[];
   integrity: IntegrityDto;
-  /** True when the exam gives each student a random subset of the questions. */
-  pooled: boolean;
   finalized: boolean;
   result: ResultSummaryDto | null;
   questions: GradingQuestionDto[];

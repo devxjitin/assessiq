@@ -28,7 +28,7 @@ import { LedgerService } from '../ledger/ledger.service';
 import { MailService } from '../mail/mail.service';
 import { SettingsService } from '../settings/settings.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { outstandingSeats, seatToken } from '../seats/capacity';
+import { seatToken } from '../seats/capacity';
 import { FakePaymentProvider, PAYMENT_PROVIDER, PaymentProvider } from './provider';
 
 // No 0/O/1/I/L so codes are easy to read out loud.
@@ -76,9 +76,6 @@ export class PaymentsService {
 
     const problems: string[] = [];
     if (exam._count.questions < 1) problems.push('Add at least one question.');
-    if (exam.questionsPerStudent && exam.questionsPerStudent > exam._count.questions) {
-      problems.push('Questions per student is more than the number of questions in the exam.');
-    }
     if (!exam.startsAt || !exam.endsAt) {
       problems.push('Set when the exam opens and closes (Settings tab).');
     } else {
@@ -373,7 +370,6 @@ export class PaymentsService {
   async createJoinOrder(user: AuthUser, rawCode: string): Promise<PublishOrderDto> {
     const exam = await this.prisma.exam.findUnique({
       where: { code: normalizeCode(rawCode) },
-      include: { _count: { select: { enrollments: true } } },
     });
     if (!exam || exam.status !== 'PUBLISHED') throw new NotFoundException('Exam code not found');
     const enrolled = await this.prisma.enrollment.findUnique({
@@ -382,14 +378,11 @@ export class PaymentsService {
     const state = computeJoinState({
       startsAt: exam.startsAt,
       endsAt: exam.endsAt,
-      maxStudents: exam.maxStudents,
-      seatsTaken: exam._count.enrollments + (await outstandingSeats(this.prisma, exam.id)),
       alreadyEnrolled: Boolean(enrolled),
     });
     if (state === 'ALREADY_ENROLLED')
       throw new ConflictException('You have already joined this exam');
     if (state === 'ENDED') throw new ConflictException('This exam has ended');
-    if (state === 'FULL') throw new ConflictException('This exam is full');
 
     const fees = await this.settings.get();
     const existing = await this.prisma.payment.findFirst({
@@ -451,7 +444,6 @@ export class PaymentsService {
     const exam = UUID.test(examId)
       ? await this.prisma.exam.findFirst({
           where: { id: examId, examinerId: user.id },
-          include: { _count: { select: { enrollments: true } } },
         })
       : null;
     if (!exam) throw new NotFoundException('Exam not found');
@@ -460,11 +452,6 @@ export class PaymentsService {
     }
     if (exam.endsAt && exam.endsAt <= new Date())
       throw new ConflictException('This exam has ended');
-    const free =
-      exam.maxStudents - exam._count.enrollments - (await outstandingSeats(this.prisma, exam.id));
-    if (seats > free) {
-      throw new ConflictException(`Only ${Math.max(0, free)} seat(s) are left in this exam`);
-    }
 
     const fees = await this.settings.get();
     const amountPaise = fees.examJoinPaise * seats;
@@ -685,10 +672,6 @@ export class PaymentsService {
       where: { examId_studentId: { examId: exam.id, studentId: payment.userId } },
     });
     if (already) return { exam, enrollment: null, reason: 'DUPLICATE' };
-    const taken =
-      (await tx.enrollment.count({ where: { examId: exam.id } })) +
-      (await outstandingSeats(tx, exam.id));
-    if (taken >= exam.maxStudents) return { exam, enrollment: null, reason: 'FULL' };
     const enrollment = await tx.enrollment.create({
       data: { examId: exam.id, studentId: payment.userId, paymentId: payment.id },
     });

@@ -15,9 +15,6 @@ const examSettings = {
   passPercent: z.number().min(0).max(100),
   shuffleQuestions: z.boolean(),
   shuffleOptions: z.boolean(),
-  maxStudents: z.number().int().min(1).max(LIMITS.MAX_STUDENTS_PER_EXAM),
-  /** Question pool: random N of the exam's questions for each student. Empty = everyone gets all. */
-  questionsPerStudent: z.number().int().min(1).max(LIMITS.MAX_QUESTIONS_PER_EXAM).nullable(),
 };
 
 const windowIsValid = (v: { startsAt?: string | null; endsAt?: string | null }) =>
@@ -32,8 +29,8 @@ export const createExamSchema = z
     passPercent: examSettings.passPercent.default(40),
     shuffleQuestions: examSettings.shuffleQuestions.default(true),
     shuffleOptions: examSettings.shuffleOptions.default(true),
-    maxStudents: examSettings.maxStudents.default(LIMITS.MAX_STUDENTS_PER_EXAM),
-    questionsPerStudent: examSettings.questionsPerStudent.default(null),
+    /** Decided once, when the exam is created. Off = no certificate tab, no certificates. */
+    certificatesEnabled: z.boolean().default(true),
   })
   .refine(windowIsValid, windowMessage);
 export type CreateExamInput = z.infer<typeof createExamSchema>;
@@ -181,8 +178,7 @@ export interface ExamDetailDto extends ExamSummaryDto {
   passPercent: number;
   shuffleQuestions: boolean;
   shuffleOptions: boolean;
-  maxStudents: number;
-  questionsPerStudent: number | null;
+  certificatesEnabled: boolean;
   hasLogo: boolean;
   /** Share code; set once the creation fee is paid. */
   code: string | null;
