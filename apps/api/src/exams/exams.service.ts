@@ -484,8 +484,8 @@ export class ExamsService {
       passPercent: exam.passPercent,
       shuffleQuestions: exam.shuffleQuestions,
       shuffleOptions: exam.shuffleOptions,
-      certificatesEnabled: certificateTemplateSchema.safeParse(exam.certificate ?? {}).data
-        ?.enabled ?? true,
+      certificatesEnabled:
+        certificateTemplateSchema.safeParse(exam.certificate ?? {}).data?.enabled ?? true,
       hasLogo: Boolean(exam.logoKey),
       code: exam.code,
       publishedAt: exam.publishedAt?.toISOString() ?? null,
