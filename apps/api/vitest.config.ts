@@ -19,6 +19,8 @@ export default defineConfig({
       JWT_ACCESS_SECRET: 'test-access-secret-0123456789abcdef0123456789',
       CERT_JOBS_POLL: 'off',
       NOTIFY_JOBS_POLL: 'off',
+      AUTH_JOBS_POLL: 'off',
+      SWEEP_JOBS_POLL: 'off',
       VERIFY_BASE_URL: 'https://parakh.nandivex.in',
       SES_EVENTS_KEY: 'test-ses-events-key-0123456789',
       OTP_SECRET: 'test-otp-secret-0123456789abcdef0123456789ab',

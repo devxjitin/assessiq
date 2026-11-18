@@ -1,9 +1,11 @@
-import { Body, Controller, Get, HttpCode, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, Post, Put, Query } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import {
   assignSeatsSchema,
+  reassignSeatSchema,
   redeemSeatSchema,
   type AssignSeatsInput,
+  type ReassignSeatInput,
   type RedeemSeatInput,
 } from '@assessiq/shared';
 import { AuthUser, CurrentUser, Roles } from '../common/decorators';
@@ -29,6 +31,40 @@ export class SeatsController {
     @Body(new ZodValidationPipe(assignSeatsSchema)) body: AssignSeatsInput,
   ) {
     return this.seats.assign(user, examId, body.emails);
+  }
+
+  @Roles('EXAMINER')
+  @Put('exams/:examId/seats/:seatId/email')
+  @HttpCode(200)
+  reassign(
+    @CurrentUser() user: AuthUser,
+    @Param('examId') examId: string,
+    @Param('seatId') seatId: string,
+    @Body(new ZodValidationPipe(reassignSeatSchema)) body: ReassignSeatInput,
+  ) {
+    return this.seats.reassign(user, examId, seatId, body.email);
+  }
+
+  @Roles('EXAMINER')
+  @Delete('exams/:examId/seats/:seatId/email')
+  @HttpCode(200)
+  unassign(
+    @CurrentUser() user: AuthUser,
+    @Param('examId') examId: string,
+    @Param('seatId') seatId: string,
+  ) {
+    return this.seats.unassign(user, examId, seatId);
+  }
+
+  @Roles('EXAMINER')
+  @Post('exams/:examId/seats/:seatId/resend')
+  @HttpCode(200)
+  resend(
+    @CurrentUser() user: AuthUser,
+    @Param('examId') examId: string,
+    @Param('seatId') seatId: string,
+  ) {
+    return this.seats.resend(user, examId, seatId);
   }
 
   /** Tokens are 160-bit secrets, but limit guessing anyway. */

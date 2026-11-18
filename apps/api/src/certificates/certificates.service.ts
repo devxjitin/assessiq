@@ -35,6 +35,8 @@ const UUID = /^[0-9a-f-]{36}$/i;
 // No I, O, 0 or 1: serials are read out loud and typed by hand.
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const MAX_EMAIL_ATTEMPTS = 5;
+/** A failed PDF is retried this many times, waiting 1, 2, 4... minutes, then left for an admin. */
+export const MAX_PDF_ATTEMPTS = 3;
 const EMAIL_LOCK_MS = 10 * 60_000;
 
 export function generateSerial(): string {
@@ -99,7 +101,13 @@ export class CertificatesService implements OnModuleInit, OnModuleDestroy {
 
   private async generatePending(): Promise<number> {
     const rows = await this.prisma.certificate.findMany({
-      where: { pdfKey: null, pdfError: null },
+      where: {
+        pdfKey: null,
+        OR: [
+          { pdfError: null },
+          { pdfAttempts: { lt: MAX_PDF_ATTEMPTS }, pdfNextAt: { lte: new Date() } },
+        ],
+      },
       take: 25,
       orderBy: { createdAt: 'asc' },
     });
@@ -237,15 +245,21 @@ export class CertificatesService implements OnModuleInit, OnModuleDestroy {
       await this.storage.put(key, pdf, 'application/pdf');
       await this.prisma.certificate.update({
         where: { id: c.id },
-        data: { pdfKey: key, pdfError: null },
+        data: { pdfKey: key, pdfError: null, pdfAttempts: 0, pdfNextAt: null },
       });
       c.pdfKey = key;
       return true;
     } catch (err) {
       this.logger.error(`Could not make the PDF for ${c.serialNo}`, err as Error);
+      const attempts = c.pdfAttempts + 1;
+      c.pdfAttempts = attempts;
       await this.prisma.certificate.update({
         where: { id: c.id },
-        data: { pdfError: String((err as Error).message ?? err).slice(0, 300) },
+        data: {
+          pdfError: String((err as Error).message ?? err).slice(0, 300),
+          pdfAttempts: attempts,
+          pdfNextAt: new Date(Date.now() + 2 ** (attempts - 1) * 60_000),
+        },
       });
       return false;
     }
@@ -500,6 +514,7 @@ export class CertificatesService implements OnModuleInit, OnModuleDestroy {
       participants: c.participants,
       status: c.status,
       pdfReady: Boolean(c.pdfKey),
+      pdfError: c.pdfKey ? null : c.pdfError,
       rejectReason: c.rejectReason,
       emailedAt: c.emailedAt?.toISOString() ?? null,
       emailError: c.emailError,
@@ -564,6 +579,25 @@ export class CertificatesService implements OnModuleInit, OnModuleDestroy {
   }
 
   /** Sends an issued certificate again (for example after the student fixed a mailbox problem). */
+  /** Admin: try making the PDF again after the automatic retries gave up. */
+  async regenerate(admin: AuthUser, id: string): Promise<{ queued: true }> {
+    const c = UUID.test(id) ? await this.prisma.certificate.findUnique({ where: { id } }) : null;
+    if (!c) throw new NotFoundException('Certificate not found');
+    if (c.pdfKey) throw new ConflictException('This certificate already has its PDF');
+    await this.prisma.certificate.update({
+      where: { id },
+      data: { pdfError: null, pdfAttempts: 0, pdfNextAt: null },
+    });
+    await this.audit.log({
+      actorId: admin.id,
+      action: 'certificate.regenerate',
+      entity: 'Certificate',
+      entityId: id,
+    });
+    this.kick();
+    return { queued: true };
+  }
+
   async resend(admin: AuthUser, id: string): Promise<{ queued: true }> {
     const c = UUID.test(id) ? await this.prisma.certificate.findUnique({ where: { id } }) : null;
     if (!c) throw new NotFoundException('Certificate not found');

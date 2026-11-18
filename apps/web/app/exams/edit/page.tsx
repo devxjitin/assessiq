@@ -4,6 +4,9 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import type { ExamDetailDto, ExamQuestionDto } from '@assessiq/shared';
 import { ExamSettingsForm } from '../../../components/exam-settings-form';
+import { CorrectionsPanel } from '../../../components/corrections-panel';
+import { ExtraTimePanel } from '../../../components/extra-time-panel';
+import { ExamControls } from '../../../components/exam-controls';
 import { PublishPanel } from '../../../components/publish-panel';
 import { CertificatePanel } from '../../../components/certificate-panel';
 import { ResultsPanel } from '../../../components/results-panel';
@@ -501,7 +504,12 @@ export default function EditExamPage() {
       </div>
 
       <section className="card">
-        {tab === 'questions' && <QuestionsTab exam={exam} reload={reload} locked={locked} />}
+        {tab === 'questions' && (
+          <>
+            <QuestionsTab exam={exam} reload={reload} locked={locked} />
+            <CorrectionsPanel exam={exam} reload={reload} />
+          </>
+        )}
         {tab === 'import' && <ImportTab exam={exam} reload={reload} locked={locked} />}
         {tab === 'settings' &&
           (locked ? (
@@ -519,9 +527,17 @@ export default function EditExamPage() {
         {tab === 'logo' && <LogoTab exam={exam} reload={reload} locked={locked} />}
         {tab === 'seats' && <SeatsPanel exam={exam} userName={user.name} userEmail={user.email} />}
         {tab === 'certificate' && <CertificatePanel exam={exam} reload={reload} />}
-        {tab === 'results' && <ResultsPanel exam={exam} reload={reload} />}
+        {tab === 'results' && (
+          <>
+            <ExtraTimePanel exam={exam} />
+            <ResultsPanel exam={exam} reload={reload} />
+          </>
+        )}
         {tab === 'publish' && (
-          <PublishPanel exam={exam} userName={user.name} userEmail={user.email} reload={reload} />
+          <>
+            <PublishPanel exam={exam} userName={user.name} userEmail={user.email} reload={reload} />
+            <ExamControls exam={exam} reload={reload} />
+          </>
         )}
       </section>
     </Shell>

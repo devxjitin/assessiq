@@ -111,6 +111,8 @@ export interface CertQueueRowDto {
   participants: number | null;
   status: CertStatus;
   pdfReady: boolean;
+  /** Why the PDF could not be made, once the automatic retries have given up. */
+  pdfError: string | null;
   rejectReason: string | null;
   emailedAt: string | null;
   emailError: string | null;

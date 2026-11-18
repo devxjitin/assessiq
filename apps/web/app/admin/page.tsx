@@ -359,7 +359,7 @@ function Exams() {
           }}
         >
           <option value="">Any status</option>
-          {['DRAFT', 'PUBLISHED', 'LIVE', 'CLOSED', 'GRADING', 'RESULTS_FINAL'].map((s) => (
+          {['DRAFT', 'PUBLISHED', 'RESULTS_FINAL', 'CANCELLED'].map((s) => (
             <option key={s} value={s}>
               {s.replace(/_/g, ' ').toLowerCase()}
             </option>

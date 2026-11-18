@@ -133,6 +133,13 @@ export class CertificatesController {
   }
 
   @Roles('ADMIN')
+  @Post('admin/certificates/:id/regenerate')
+  @HttpCode(200)
+  regenerate(@CurrentUser() admin: AuthUser, @Param('id') id: string) {
+    return this.certificates.regenerate(admin, id);
+  }
+
+  @Roles('ADMIN')
   @Post('admin/certificates/:id/resend')
   @HttpCode(200)
   resend(@CurrentUser() admin: AuthUser, @Param('id') id: string) {

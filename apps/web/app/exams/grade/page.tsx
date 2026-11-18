@@ -13,6 +13,7 @@ import {
   useQueryParam,
 } from '../../../components/ui';
 import { TestStatusBadge } from '../../../components/code-answer';
+import { MarkOverride } from '../../../components/mark-override';
 import { api } from '../../../lib/api';
 import { useRequireAuth } from '../../../lib/auth';
 
@@ -310,6 +311,28 @@ export default function GradePage() {
         </ul>
       </section>
 
+      {data.history.length > 0 && (
+        <section className="card" style={{ marginBottom: 14 }}>
+          <strong>History</strong>
+          <ul>
+            {data.history.map((h, i) => (
+              <li key={i}>
+                {new Date(h.at).toLocaleString()} ·{' '}
+                {
+                  {
+                    ADD_TIME: `trainer added ${h.minutes} min`,
+                    REOPEN: `trainer reopened the attempt for ${h.minutes} min`,
+                    DEVICE_RELEASED: 'trainer released the device',
+                    DEVICE_AUTO_RELEASED: 'device switched automatically (old one was silent)',
+                  }[h.action]
+                }
+                {h.reason ? `, reason: ${h.reason}` : ''}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {data.questions.map((q) => (
         <section className="card" key={q.questionId} style={{ marginBottom: 14 }}>
           <div className="toolbar">
@@ -363,6 +386,15 @@ export default function GradePage() {
               })}
               {q.selected.length === 0 && <li className="muted">Not answered</li>}
             </ul>
+          )}
+          {(q.type === 'SINGLE' || q.type === 'MULTI') && (
+            <MarkOverride
+              q={q}
+              examId={data.examId}
+              attemptId={data.attemptId}
+              locked={data.finalized}
+              onSaved={load}
+            />
           )}
         </section>
       ))}

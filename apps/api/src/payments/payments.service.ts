@@ -158,6 +158,7 @@ export class PaymentsService {
       });
       throw new BadRequestException('Payment verification failed');
     }
+    if (payment.status === 'REFUNDED') throw new ConflictException('This payment was refunded');
     const done = await this.capture(input.orderId, input.paymentId, undefined, 'checkout');
     if (!done || done.status !== 'CAPTURED') {
       throw new BadRequestException('Payment could not be confirmed');
@@ -265,7 +266,7 @@ export class PaymentsService {
 
     const published = await this.prisma.$transaction(async (tx) => {
       const claimed = await tx.payment.updateMany({
-        where: { id: payment.id, status: { not: 'CAPTURED' } },
+        where: { id: payment.id, status: { in: ['CREATED', 'FAILED'] } },
         data: {
           status: 'CAPTURED',
           providerPaymentId: paymentId,
@@ -339,17 +340,19 @@ export class PaymentsService {
             paidAt: fresh.capturedAt ?? new Date(),
           });
         } else if (!published.exam) {
-          await this.audit.log({
-            action: 'payment.orphan',
-            entity: 'Payment',
-            entityId: payment.id,
-          });
+          await this.flagOrphan(payment.id);
         }
       } else if (!published.exam) {
         // Paid, but the exam was deleted meanwhile: flag for a manual refund.
-        await this.audit.log({ action: 'payment.orphan', entity: 'Payment', entityId: payment.id });
+        await this.flagOrphan(payment.id);
       } else if (published.exam.code) {
         const user = await this.prisma.user.findUnique({ where: { id: payment.userId } });
+        if (user && published.exam.endsAt && published.exam.endsAt <= new Date()) {
+          // Published, but the window is already over: tell the trainer to extend it.
+          await this.mail.sendWindowPassed(user.email, user.name, {
+            examTitle: published.exam.title,
+          });
+        }
         if (user) {
           await this.mail.sendPublishReceipt(user.email, user.name, {
             examTitle: published.exam.title,
@@ -614,6 +617,31 @@ export class PaymentsService {
   }
 
   /** Recent payments for the admin to find and refund. */
+  /** Money taken but nothing delivered: mark it so the admin console lists it for a refund. */
+  private async flagOrphan(paymentId: string, reason?: string) {
+    const payment = await this.prisma.payment.update({
+      where: { id: paymentId },
+      data: { needsRefund: true },
+    });
+    const admins = await this.prisma.user.findMany({
+      where: { role: 'ADMIN', status: 'ACTIVE' },
+      select: { email: true },
+    });
+    for (const a of admins) {
+      await this.mail.sendRefundNeeded(a.email, {
+        receiptNo: formatReceiptNo(payment.receiptNo),
+        amountPaise: payment.amountPaise,
+        reason: reason ?? 'no seat or exam',
+      });
+    }
+    await this.audit.log({
+      action: 'payment.orphan',
+      entity: 'Payment',
+      entityId: paymentId,
+      meta: reason ? { reason } : undefined,
+    });
+  }
+
   async listForAdmin(filter: {
     status?: string;
     purpose?: string;
@@ -654,6 +682,7 @@ export class PaymentsService {
       capturedAt: p.capturedAt?.toISOString() ?? null,
       refundedAt: p.refundedAt?.toISOString() ?? null,
       refundReason: p.refundReason,
+      needsRefund: p.needsRefund,
     }));
   }
 
@@ -690,12 +719,7 @@ export class PaymentsService {
   ) {
     if (!result.enrollment || !result.exam) {
       // Money taken but no seat: flag for a manual refund.
-      await this.audit.log({
-        action: 'payment.orphan',
-        entity: 'Payment',
-        entityId: paymentId,
-        meta: { reason: result.reason ?? 'UNKNOWN' },
-      });
+      await this.flagOrphan(paymentId, result.reason ?? 'UNKNOWN');
       return;
     }
     const user = await this.prisma.user.findUnique({ where: { id: userId } });

@@ -137,6 +137,10 @@ describe('automatic marking at submit', () => {
         where: { attemptId: samAttempt },
         data: { createdAt: new Date(Date.now() - 60_000 * (i + 1)) },
       });
+      await ctx.prisma.attempt.update({
+        where: { id: samAttempt },
+        data: { lastStrikeAt: new Date(Date.now() - 60_000 * (i + 1)) },
+      });
     }
     const row = (await results().expect(200)).body.rows[0];
     expect(row).toMatchObject({ status: 'GRADED', endReason: 'STRIKES', score: 2 });
@@ -279,6 +283,14 @@ describe('publishing results', () => {
 
     await grade(1).expect(409); // locked
     await finalize().expect(409); // already done
+  });
+
+  it('two simultaneous finalize calls publish once', async () => {
+    await samPerfect();
+    await grade(4).expect(200);
+    await closeExam();
+    const codes = (await Promise.all([finalize(), finalize()])).map((r) => r.status).sort();
+    expect(codes).toEqual([200, 409]);
   });
 
   it("one student cannot read another's result", async () => {

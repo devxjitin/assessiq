@@ -237,6 +237,7 @@ describe('paying to publish', () => {
     const payment = await ctx.prisma.payment.findUnique({ where: { providerOrderId: o.orderId } });
     expect(payment?.status).toBe('CAPTURED');
     expect(await ctx.prisma.auditLog.count({ where: { action: 'payment.orphan' } })).toBe(1);
+    expect(payment?.needsRefund).toBe(true);
   });
 });
 
@@ -312,6 +313,35 @@ describe('webhook', () => {
       (await ctx.prisma.payment.findUnique({ where: { providerOrderId: ob.orderId } }))?.status,
     ).toBe('CAPTURED');
     expect((await ctx.prisma.exam.findUnique({ where: { id: b } }))?.status).toBe('PUBLISHED');
+  });
+
+  it('answers 409 when a refunded payment is verified again', async () => {
+    const id = await readyExam();
+    const o = await order(id);
+    const c = await checkout(o.orderId);
+    await ctx.http().post('/payments/verify').set(auth(trainer)).send(c).expect(200);
+    await ctx.prisma.payment.update({
+      where: { providerOrderId: o.orderId },
+      data: { status: 'REFUNDED' },
+    });
+    await ctx.http().post('/payments/verify').set(auth(trainer)).send(c).expect(409);
+    expect(
+      (await ctx.prisma.payment.findUnique({ where: { providerOrderId: o.orderId } }))?.status,
+    ).toBe('REFUNDED');
+  });
+
+  it('never re-captures a refunded payment on a replayed capture event', async () => {
+    const id = await readyExam();
+    const o = await order(id);
+    await webhook('payment.captured', o.orderId, 'pay_r', 19900, 'evt_r1').expect(200);
+    await ctx.prisma.payment.update({
+      where: { providerOrderId: o.orderId },
+      data: { status: 'REFUNDED' },
+    });
+    await webhook('payment.captured', o.orderId, 'pay_r', 19900, 'evt_r2').expect(200);
+    expect(
+      (await ctx.prisma.payment.findUnique({ where: { providerOrderId: o.orderId } }))?.status,
+    ).toBe('REFUNDED');
   });
 
   it('can retry a failed order with a fresh one', async () => {

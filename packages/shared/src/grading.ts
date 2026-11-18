@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { AttemptHistoryDto } from './accommodations';
 import type { CodeSubmissionDto } from './coding';
 import type { IntegrityDto, IntegrityFlagCode } from './integrity';
 
@@ -134,6 +135,10 @@ export interface GradingQuestionDto {
   submission: CodeSubmissionDto | null;
   marksAwarded: number | null;
   feedback: string | null;
+  /** The question was dropped: everyone has its full marks. */
+  dropped: boolean;
+  /** The trainer set this mark by hand, with the reason. */
+  override: { marks: number; reason: string } | null;
 }
 
 export interface GradingAttemptDto {
@@ -145,6 +150,8 @@ export interface GradingAttemptDto {
   endReason: string | null;
   strikes: number;
   events: { type: string; strike: boolean; at: string; ip: string | null }[];
+  /** Time added, reopenings and device releases, oldest first. */
+  history: AttemptHistoryDto[];
   integrity: IntegrityDto;
   finalized: boolean;
   result: ResultSummaryDto | null;
@@ -170,5 +177,7 @@ export interface StudentResultDto extends ResultSummaryDto {
     marksAwarded: number;
     explanation: string | null;
     feedback: string | null;
+    /** The trainer dropped this question, so everyone got full marks. */
+    dropped: boolean;
   }[];
 }

@@ -102,6 +102,35 @@ export class MailService {
     });
   }
 
+  /** Tells an admin that a customer paid but received nothing, so a refund is due. */
+  sendRefundNeeded(to: string, r: { receiptNo: string; amountPaise: number; reason: string }) {
+    const amount = '₹' + (r.amountPaise / 100).toFixed(2);
+    return this.deliver({
+      to,
+      subject: `Refund needed: ${r.receiptNo}`,
+      text: `Payment ${r.receiptNo} (${amount}) was taken but nothing was delivered (${r.reason}).
+Open Admin > Payments and refund it.
+`,
+      html: layout(
+        'Refund needed',
+        `<p>Payment <b>${esc(r.receiptNo)}</b> (${esc(amount)}) was taken but nothing was delivered (${esc(r.reason)}). Open Admin &gt; Payments and refund it.</p>`,
+      ),
+    });
+  }
+
+  /** The trainer paid to publish, but the exam's closing time had already passed. */
+  sendWindowPassed(to: string, name: string, r: { examTitle: string }) {
+    return this.deliver({
+      to,
+      subject: `Extend the closing time of "${r.examTitle}"`,
+      text: `Hi ${name},\n\nYour payment for "${r.examTitle}" went through, but the exam's closing time has already passed, so students cannot join. Open the exam on Parakh, go to Share, and use "Extend closing time".\n`,
+      html: layout(
+        'Extend the closing time',
+        `<p>Hi ${esc(name)}, your payment for <strong>${esc(r.examTitle)}</strong> went through, but the exam's closing time has already passed, so students cannot join. Open the exam, go to Share, and use <em>Extend closing time</em>.</p>`,
+      ),
+    });
+  }
+
   sendAccountExists(to: string, name: string) {
     return this.deliver({
       to,

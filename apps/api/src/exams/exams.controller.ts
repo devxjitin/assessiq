@@ -69,6 +69,12 @@ export class ExamsController {
     await this.exams.remove(user, id);
   }
 
+  @Post(':id/duplicate')
+  @HttpCode(201)
+  duplicate(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.exams.duplicate(user, id);
+  }
+
   @Get(':id/preview')
   preview(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.exams.preview(user, id);

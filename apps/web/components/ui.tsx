@@ -170,6 +170,7 @@ const BADGE_KIND: Record<string, string> = {
   CERT_PENDING_APPROVAL: 'warn',
   ACTIVE: 'success',
   SUSPENDED: 'danger',
+  CANCELLED: 'danger',
 };
 
 export function StatusBadge({ status, label }: { status: string; label?: string }) {

@@ -2,14 +2,16 @@ import { z } from 'zod';
 
 // ----------------------------------------------------------------- platform settings
 
-const paise = (max: number) => z.number().int().min(0).max(max);
+const paise = (max: number, min = 0) => z.number().int().min(min).max(max);
+/** Razorpay rejects orders below 100 paise (Rs 1), so a fee cannot be lower. */
+export const MIN_FEE_PAISE = 100;
 
 /** What NandiVex can change from the admin console. Applies to payments made from then on. */
 export const platformSettingsSchema = z.object({
   /** Trainer pays this to publish an exam. */
-  examCreationPaise: paise(10_000_00),
+  examCreationPaise: paise(10_000_00, MIN_FEE_PAISE),
   /** Student pays this to join an exam. */
-  examJoinPaise: paise(10_000_00),
+  examJoinPaise: paise(10_000_00, MIN_FEE_PAISE),
   /** Trainer's share of each student-paid fee, in percent. */
   examinerSharePercent: z.number().int().min(0).max(100),
   /** Trainers can ask for a payout once this much is payable. */
