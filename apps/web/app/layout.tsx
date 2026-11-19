@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { SiteLinks } from '../components/legal';
 import { AuthProvider } from '../lib/auth';
 import './globals.css';
 
@@ -18,6 +19,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       </head>
       <body>
         <AuthProvider>{children}</AuthProvider>
+        <footer className="site-footer">
+          <SiteLinks />
+          <span>© NandiVex Technologies</span>
+        </footer>
       </body>
     </html>
   );

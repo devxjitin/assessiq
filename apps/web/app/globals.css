@@ -1450,3 +1450,43 @@ html.theme-fade *::after {
   border-color: var(--danger);
   color: var(--danger);
 }
+
+/* ---------- legal pages and footer ---------- */
+.page.legal {
+  max-width: 720px;
+  line-height: 1.6;
+}
+.page.legal h2 {
+  margin: 28px 0 8px;
+  font-size: 1.1rem;
+}
+.page.legal ul {
+  padding-left: 20px;
+}
+.page.legal li {
+  margin: 6px 0;
+}
+.site-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  justify-content: center;
+  padding: 20px 16px 28px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.site-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+.consent {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 12px 0;
+  font-size: 0.9rem;
+}
+.consent input {
+  margin-top: 3px;
+}

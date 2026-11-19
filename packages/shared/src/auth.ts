@@ -23,6 +23,9 @@ const phoneSchema = z
   .trim()
   .regex(/^\+?[0-9]{7,15}$/, 'Enter a valid phone number');
 
+/** Bump when /terms, /privacy or /refund-policy change in a way users must accept again. */
+export const LEGAL_VERSION = '2026-11-19-draft';
+
 export const registerSchema = z.object({
   name: z.string().trim().min(2, 'Enter your name').max(100),
   email: emailSchema,
@@ -31,6 +34,9 @@ export const registerSchema = z.object({
   role: z.enum(['STUDENT', 'EXAMINER']),
   phone: phoneSchema.optional(),
   orgName: z.string().trim().max(120).optional(),
+  acceptTerms: z.literal(true, {
+    errorMap: () => ({ message: 'Accept the Terms and Privacy Policy to continue' }),
+  }),
 });
 export type RegisterInput = z.infer<typeof registerSchema>;
 

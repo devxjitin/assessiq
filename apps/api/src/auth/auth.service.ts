@@ -8,6 +8,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import type { OtpPurpose, User } from '@prisma/client';
+import { LEGAL_VERSION } from '@assessiq/shared';
 import type {
   AuthResponse,
   ChangePasswordInput,
@@ -80,6 +81,8 @@ export class AuthService {
             name: input.name,
             phone: input.phone,
             role: input.role,
+            termsAcceptedAt: new Date(),
+            termsVersion: LEGAL_VERSION,
           },
         });
         if (input.role === 'EXAMINER') {
@@ -104,6 +107,8 @@ export class AuthService {
         phone: input.phone,
         passwordHash,
         role: input.role,
+        termsAcceptedAt: new Date(),
+        termsVersion: LEGAL_VERSION,
         examinerProfile:
           input.role === 'EXAMINER' ? { create: { orgName: input.orgName ?? null } } : undefined,
       },

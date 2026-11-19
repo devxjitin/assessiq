@@ -198,6 +198,9 @@ export function PublishPanel({
         <Button disabled={!ready} loading={busy} onClick={pay}>
           Pay {rupees(PRICING.EXAM_CREATION_PAISE)} and publish
         </Button>
+        <p className="muted" style={{ margin: '8px 0 0' }}>
+          See the <a href="/refund-policy/">refund policy</a>.
+        </p>
       </div>
     </div>
   );

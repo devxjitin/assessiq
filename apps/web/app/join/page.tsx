@@ -169,6 +169,10 @@ export default function JoinPage() {
                 <Button loading={busy} onClick={pay}>
                   Pay {rupees(info.feePaise)} and join
                 </Button>
+                <p className="muted" style={{ margin: '8px 0 0' }}>
+                  See the <Link href="/refund-policy/">refund policy</Link>. If the trainer cancels
+                  the exam before you start, you are refunded automatically.
+                </p>
               </div>
             )}
             {info.state === 'ALREADY_ENROLLED' && (

@@ -35,6 +35,7 @@ export default function RegisterPage() {
       password: form.get('password'),
       phone: (form.get('phone') as string) || undefined,
       orgName: role === 'EXAMINER' ? (form.get('orgName') as string) || undefined : undefined,
+      acceptTerms: form.get('acceptTerms') === 'on',
     });
     if (!result.ok) {
       setErrors(result.errors);
@@ -112,6 +113,18 @@ export default function RegisterPage() {
               error={errors.orgName}
             />
           )}
+          <label className="consent">
+            <input
+              type="checkbox"
+              name="acceptTerms"
+              aria-invalid={errors.acceptTerms ? true : undefined}
+            />
+            <span>
+              I accept the <Link href="/terms/">Terms of use</Link> and the{' '}
+              <Link href="/privacy/">Privacy policy</Link>.
+              {errors.acceptTerms && <small className="error-text"> {errors.acceptTerms}</small>}
+            </span>
+          </label>
           {formError && <Alert>{formError}</Alert>}
           <Button type="submit" loading={busy}>
             Create account
