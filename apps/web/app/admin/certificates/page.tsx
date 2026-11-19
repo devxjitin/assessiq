@@ -114,6 +114,12 @@ export default function AdminCertificatesPage() {
     }
   }
 
+  const regenerate = (row: CertQueueRowDto) =>
+    run('regen' + row.id, async () => {
+      await api(`/admin/certificates/${row.id}/regenerate`, { method: 'POST' });
+      return `Making the PDF for ${row.serialNo} again.`;
+    });
+
   const resend = (row: CertQueueRowDto) =>
     run('resend' + row.id, async () => {
       await api(`/admin/certificates/${row.id}/resend`, { method: 'POST' });
@@ -295,6 +301,16 @@ export default function AdminCertificatesPage() {
                         <Button variant="secondary" small onClick={() => preview(r)}>
                           Preview
                         </Button>
+                        {r.pdfError && (
+                          <Button
+                            variant="danger"
+                            small
+                            loading={busy === 'regen' + r.id}
+                            onClick={() => regenerate(r)}
+                          >
+                            PDF failed: regenerate
+                          </Button>
+                        )}
                         {(r.status === 'EMAILED' || r.status === 'APPROVED') && (
                           <Button
                             variant="secondary"

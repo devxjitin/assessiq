@@ -32,7 +32,7 @@ import { toTestStatus } from '../code/code-judge.service';
 import { GradingService } from '../results/grading.service';
 
 const UUID = /^[0-9a-f-]{36}$/i;
-const OVER = ['CLOSED', 'GRADING', 'RESULTS_FINAL', 'CERT_PENDING_APPROVAL', 'CERT_RELEASED'];
+const OVER = ['RESULTS_FINAL', 'CANCELLED'];
 
 const DAY_MS = 86_400_000;
 
@@ -56,9 +56,7 @@ export class PracticeService {
   private isOver(exam: Pick<Exam, 'status' | 'endsAt'>): boolean {
     if (OVER.includes(exam.status)) return true;
     return (
-      (exam.status === 'PUBLISHED' || exam.status === 'LIVE') &&
-      exam.endsAt !== null &&
-      exam.endsAt.getTime() <= Date.now()
+      exam.status === 'PUBLISHED' && exam.endsAt !== null && exam.endsAt.getTime() <= Date.now()
     );
   }
 

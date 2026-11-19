@@ -211,6 +211,8 @@ export interface AdminPaymentRow {
   capturedAt: string | null;
   refundedAt: string | null;
   refundReason: string | null;
+  /** Paid but nothing delivered: refund it by hand. */
+  needsRefund: boolean;
 }
 
 export interface LedgerCheckDto {
@@ -255,6 +257,10 @@ export interface SeatsDto {
   examId: string;
   bought: number;
   redeemed: number;
+  /** Seats paid for but never used. */
+  unused: number;
+  /** The exam is over, so unused seats can no longer be used. */
+  closed: boolean;
   priceEachPaise: number;
   seats: SeatDto[];
 }
@@ -267,3 +273,8 @@ export interface SeatPreviewDto {
   /** Set when the seat is reserved for one email address. */
   forEmail: string | null;
 }
+
+export const reassignSeatSchema = z.object({
+  email: z.string().trim().toLowerCase().email('Enter a valid email address'),
+});
+export type ReassignSeatInput = z.infer<typeof reassignSeatSchema>;

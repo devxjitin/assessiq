@@ -168,8 +168,10 @@ export class AdminReportsService {
         this.prisma.user.groupBy({ by: ['role'], _count: { _all: true } }),
         this.prisma.user.count({ where: { status: 'SUSPENDED' } }),
         this.prisma.exam.count(),
-        this.prisma.exam.count({ where: { status: { in: ['PUBLISHED', 'LIVE'] } } }),
-        this.prisma.exam.count({ where: { status: { in: ['CLOSED', 'GRADING'] } } }),
+        this.prisma.exam.count({
+          where: { status: 'PUBLISHED', OR: [{ endsAt: null }, { endsAt: { gt: new Date() } }] },
+        }),
+        this.prisma.exam.count({ where: { status: 'PUBLISHED', endsAt: { lte: new Date() } } }),
         this.prisma.enrollment.count(),
         this.prisma.payout.count({ where: { status: 'REQUESTED' } }),
         this.prisma.certificate.count({ where: { status: 'GENERATED' } }),

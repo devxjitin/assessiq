@@ -49,6 +49,13 @@ const schema = z.object({
   OTP_RESEND_SECONDS: z.coerce.number().default(60),
   LOGIN_MAX_FAILURES: z.coerce.number().default(5),
   LOCK_MINUTES: z.coerce.number().default(15),
+  // Failures (from any network) before the whole account is locked. Far above LOGIN_MAX_FAILURES,
+  // which only locks one email+IP pair.
+  ACCOUNT_LOCK_FAILURES: z.coerce.number().default(20),
+  // 'on' starts the hourly clean-up of stale sign-in records and unverified sign-ups.
+  AUTH_JOBS_POLL: z.enum(['on', 'off']).default('on'),
+  // 'on' starts the minute-by-minute job that ends attempts whose time ran out.
+  SWEEP_JOBS_POLL: z.enum(['on', 'off']).default('on'),
 });
 
 export type Env = z.infer<typeof schema> & { cookieSecure: boolean };
@@ -67,6 +74,20 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
       (k) => !source[k],
     );
     if (missing.length) throw new Error(`PAYMENT_PROVIDER=razorpay needs: ${missing.join(', ')}`);
+  }
+  if (env.NODE_ENV === 'production') {
+    const bad: string[] = [];
+    if (env.PAYMENT_PROVIDER === 'fake' && source.ALLOW_FAKE_PAYMENTS !== 'true') {
+      bad.push('PAYMENT_PROVIDER=fake (set ALLOW_FAKE_PAYMENTS=true only on staging)');
+    }
+    if (env.STORAGE_DRIVER === 'memory')
+      bad.push('STORAGE_DRIVER=memory (files would be lost on restart)');
+    if (env.STORAGE_DRIVER === 's3' && !env.S3_BUCKET)
+      bad.push('S3_BUCKET is required with STORAGE_DRIVER=s3');
+    if (env.MAIL_TRANSPORT !== 'ses') bad.push('MAIL_TRANSPORT must be ses');
+    if (env.CODE_RUNNER === 'fake') bad.push('CODE_RUNNER=fake');
+    if (!/^https:\/\//.test(env.WEB_ORIGIN)) bad.push('WEB_ORIGIN must be an https URL');
+    if (bad.length) throw new Error('Unsafe production configuration: ' + bad.join('; '));
   }
   return {
     ...env,

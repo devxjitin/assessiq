@@ -1,26 +1,30 @@
-import { Body, Controller, Get, HttpCode, Param, Post, Put } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Post, Put, UseGuards } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import {
+  proctorEventBatchSchema,
   proctorEventSchema,
   runCodeSchema,
   type RunCodeInput,
   saveAnswerSchema,
   startAttemptSchema,
+  type ProctorEventBatchInput,
   type ProctorEventInput,
   type SaveAnswerInput,
   type StartAttemptInput,
 } from '@assessiq/shared';
 import { AuthUser, Client, ClientInfo, CurrentUser, Roles } from '../common/decorators';
+import { UserRateLimitGuard } from '../common/user-rate-limit.guard';
 import { ZodValidationPipe } from '../common/zod.pipe';
 import { ResultsService } from '../results/results.service';
 import { AttemptsService } from './attempts.service';
 
 /**
  * Autosave and proctor events are frequent and authenticated, and a whole classroom can share
- * one IP address, so the per-IP rate limit is switched off here.
+ * one IP address, so the per-IP rate limit is switched off here and replaced by a per-user one.
  */
 @Roles('STUDENT')
 @SkipThrottle()
+@UseGuards(UserRateLimitGuard)
 @Controller('attempts')
 export class AttemptsController {
   constructor(
@@ -76,6 +80,17 @@ export class AttemptsController {
   @HttpCode(200)
   submit(@CurrentUser() user: AuthUser, @Client() client: ClientInfo, @Param('id') id: string) {
     return this.attempts.submit(user, id, client);
+  }
+
+  @Post(':id/events/batch')
+  @HttpCode(200)
+  eventBatch(
+    @CurrentUser() user: AuthUser,
+    @Client() client: ClientInfo,
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(proctorEventBatchSchema)) body: ProctorEventBatchInput,
+  ) {
+    return this.attempts.recordEvents(user, id, body.events, client);
   }
 
   @Post(':id/events')

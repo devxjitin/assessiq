@@ -30,6 +30,7 @@ import { GRACE_MS } from '../common/timing';
 import { PrismaService } from '../prisma/prisma.service';
 import { CODE_RUNNER, CodeRunner } from '../code/code-runner';
 import { toTestStatus } from '../code/code-judge.service';
+import { DEVICE_SILENT_MS } from '@assessiq/shared';
 import { GradingService } from '../results/grading.service';
 
 /** Blur and tab-hidden usually fire together; events this close count as one strike. */
@@ -76,8 +77,11 @@ export class AttemptsService {
       throw new ConflictException('This exam has not opened yet');
     if (exam.endsAt && exam.endsAt <= now) throw new ConflictException('This exam has ended');
 
-    const byDuration = new Date(now.getTime() + exam.durationMinutes * 60_000);
-    const deadlineAt = exam.endsAt && exam.endsAt < byDuration ? exam.endsAt : byDuration;
+    // A student with extra time (accommodation) also gets the window extended by that much.
+    const extra = enrollment.extraMinutes * 60_000;
+    const byDuration = new Date(now.getTime() + exam.durationMinutes * 60_000 + extra);
+    const closing = exam.endsAt ? new Date(exam.endsAt.getTime() + extra) : null;
+    const deadlineAt = closing && closing < byDuration ? closing : byDuration;
 
     // Every student gets the same paper; only the order may differ.
     const ids = exam.questions.map((q) => q.id);
@@ -104,6 +108,7 @@ export class AttemptsService {
           deviceId: client.deviceId,
           startIp: client.ip,
           lastIp: client.ip,
+          lastSeenAt: now,
           userAgent: client.userAgent,
         },
       });
@@ -180,7 +185,8 @@ export class AttemptsService {
       serverTime: new Date().toISOString(),
       deadlineAt: attempt.deadlineAt.toISOString(),
       strikes: attempt.strikes,
-      maxStrikes: LIMITS.MAX_STRIKES,
+      maxStrikes: exam.maxStrikes,
+      strikePolicy: exam.strikePolicy,
       exam: {
         title: exam.title,
         instructions: exam.instructions,
@@ -232,18 +238,42 @@ export class AttemptsService {
       selected = unique.sort((a, b) => a - b);
     }
 
-    await this.prisma.answer.upsert({
-      where: { attemptId_questionId: { attemptId, questionId } },
-      create: {
-        attemptId,
-        questionId,
-        selected: selected ?? [],
-        text: text ?? null,
-        language: language ?? null,
-        flagged: input.flagged ?? false,
+    const seq = input.seq !== undefined ? BigInt(input.seq) : null;
+    const updated = await this.prisma.answer.updateMany({
+      where: { attemptId, questionId, ...(seq !== null ? { clientSeq: { lt: seq } } : {}) },
+      data: {
+        selected,
+        text,
+        language,
+        flagged: input.flagged,
+        ...(seq !== null ? { clientSeq: seq } : {}),
       },
-      update: { selected, text, language, flagged: input.flagged },
     });
+    if (updated.count === 0) {
+      const exists = await this.prisma.answer.findUnique({
+        where: { attemptId_questionId: { attemptId, questionId } },
+        select: { id: true },
+      });
+      // A row that exists but did not match is a late, older save: ignore it.
+      if (!exists) {
+        try {
+          await this.prisma.answer.create({
+            data: {
+              attemptId,
+              questionId,
+              selected: selected ?? [],
+              text: text ?? null,
+              language: language ?? null,
+              flagged: input.flagged ?? false,
+              clientSeq: seq ?? 0n,
+            },
+          });
+        } catch (err) {
+          // Two first saves raced; the other one won and this one is the older.
+          if ((err as { code?: string }).code !== 'P2002') throw err;
+        }
+      }
+    }
     return { saved: true };
   }
 
@@ -376,6 +406,21 @@ export class AttemptsService {
    * client cannot lower their strikes, only stop reporting them (which is why this is
    * advisory evidence for the trainer, not proof).
    */
+  /** Events queued while the student was offline. Handled in order; stops once the attempt ends. */
+  async recordEvents(
+    user: AuthUser,
+    attemptId: string,
+    events: ProctorEventInput[],
+    client: ClientInfo,
+  ) {
+    let result = await this.recordEvent(user, attemptId, events[0], client);
+    for (const e of events.slice(1)) {
+      if (result.ended) break;
+      result = await this.recordEvent(user, attemptId, e, client);
+    }
+    return result;
+  }
+
   async recordEvent(
     user: AuthUser,
     attemptId: string,
@@ -386,14 +431,27 @@ export class AttemptsService {
     if (attempt.status !== 'IN_PROGRESS') {
       return { strikes: attempt.strikes, ended: true, status: attempt.status };
     }
+    const exam = await this.prisma.exam.findUniqueOrThrow({
+      where: { id: attempt.examId },
+      select: { strikePolicy: true, maxStrikes: true },
+    });
     const now = new Date();
     let strike = false;
-    if (STRIKE_EVENTS.includes(input.type)) {
-      const last = await this.prisma.proctorEvent.findFirst({
-        where: { attemptId, strike: true },
-        orderBy: { createdAt: 'desc' },
+    // With the policy OFF nothing costs a strike; the event is only logged for the trainer.
+    if (exam.strikePolicy !== 'OFF' && STRIKE_EVENTS.includes(input.type)) {
+      // One conditional update decides, so two events in the same instant cannot both count.
+      const claimed = await this.prisma.attempt.updateMany({
+        where: {
+          id: attemptId,
+          status: 'IN_PROGRESS',
+          OR: [
+            { lastStrikeAt: null },
+            { lastStrikeAt: { lt: new Date(now.getTime() - STRIKE_DEBOUNCE_MS) } },
+          ],
+        },
+        data: { strikes: { increment: 1 }, lastStrikeAt: now },
       });
-      strike = !last || now.getTime() - last.createdAt.getTime() > STRIKE_DEBOUNCE_MS;
+      strike = claimed.count === 1;
     }
     await this.prisma.proctorEvent.create({
       data: { attemptId, type: input.type, strike, ip: client.ip, deviceId: client.deviceId },
@@ -402,12 +460,8 @@ export class AttemptsService {
     let strikes = attempt.strikes;
     let status: string = attempt.status;
     if (strike) {
-      const updated = await this.prisma.attempt.update({
-        where: { id: attemptId },
-        data: { strikes: { increment: 1 } },
-      });
-      strikes = updated.strikes;
-      if (strikes >= LIMITS.MAX_STRIKES) {
+      strikes = (await this.prisma.attempt.findUniqueOrThrow({ where: { id: attemptId } })).strikes;
+      if (exam.strikePolicy === 'AUTO_SUBMIT' && strikes >= exam.maxStrikes) {
         await this.prisma.attempt.updateMany({
           where: { id: attemptId, status: 'IN_PROGRESS' },
           data: { status: 'AUTO_SUBMITTED', endReason: 'STRIKES', submittedAt: now },
@@ -445,6 +499,36 @@ export class AttemptsService {
    */
   private async guardDevice(attempt: Attempt, client: ClientInfo): Promise<void> {
     if (attempt.status !== 'IN_PROGRESS') return;
+    if (attempt.deviceId && client.deviceId && client.deviceId !== attempt.deviceId) {
+      const silentFor = attempt.lastSeenAt ? Date.now() - attempt.lastSeenAt.getTime() : 0;
+      if (silentFor > DEVICE_SILENT_MS) {
+        // The old device has gone quiet (crash, cleared storage, new phone): hand the attempt over
+        // and leave a trace for the trainer.
+        const moved = await this.prisma.attempt.updateMany({
+          where: { id: attempt.id, deviceId: attempt.deviceId, status: 'IN_PROGRESS' },
+          data: { deviceId: client.deviceId, lastSeenAt: new Date(), lastIp: client.ip },
+        });
+        if (moved.count > 0) {
+          await this.prisma.proctorEvent.create({
+            data: {
+              attemptId: attempt.id,
+              type: 'DEVICE_AUTO_RELEASED',
+              strike: false,
+              ip: client.ip,
+              deviceId: client.deviceId,
+            },
+          });
+          await this.audit.log({
+            actorId: attempt.studentId,
+            action: 'attempt.device.auto_release',
+            entity: 'Attempt',
+            entityId: attempt.id,
+            meta: { silentSeconds: Math.round(silentFor / 1000) },
+          });
+        }
+        return;
+      }
+    }
     if (attempt.deviceId && client.deviceId !== attempt.deviceId) {
       const recent = await this.prisma.proctorEvent.findFirst({
         where: { attemptId: attempt.id, type: 'DEVICE_MISMATCH' },
@@ -470,6 +554,10 @@ export class AttemptsService {
     }
     const patch: Prisma.AttemptUpdateManyMutationInput = {};
     if (!attempt.deviceId && client.deviceId) patch.deviceId = client.deviceId;
+    // Heartbeat for "is the bound device still alive", written at most every 20 seconds.
+    if (!attempt.lastSeenAt || Date.now() - attempt.lastSeenAt.getTime() > 20_000) {
+      patch.lastSeenAt = new Date();
+    }
     if (client.ip && client.ip !== attempt.lastIp) patch.lastIp = client.ip;
     if (Object.keys(patch).length) {
       // Binding is conditional so two first requests cannot both claim the attempt.

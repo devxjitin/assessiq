@@ -244,6 +244,8 @@ describe('platform settings', () => {
     await put(admin, '/admin/settings', { ...ok, examinerSharePercent: 101 }).expect(400);
     await put(admin, '/admin/settings', { ...ok, examJoinPaise: -1 }).expect(400);
     await put(admin, '/admin/settings', { ...ok, examJoinPaise: 99.5 }).expect(400);
+    await put(admin, '/admin/settings', { ...ok, examJoinPaise: 0 }).expect(400);
+    await put(admin, '/admin/settings', { ...ok, examCreationPaise: 99 }).expect(400);
     await put(admin, '/admin/settings', { ...ok, minPayoutPaise: undefined }).expect(400);
   });
 

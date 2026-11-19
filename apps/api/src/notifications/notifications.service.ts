@@ -42,7 +42,7 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
           reminderSentAt: null,
           attempt: null,
           exam: {
-            status: { in: ['PUBLISHED', 'LIVE'] },
+            status: 'PUBLISHED',
             startsAt: { gt: now, lte: new Date(now.getTime() + REMINDER_WINDOW_MS) },
           },
         },

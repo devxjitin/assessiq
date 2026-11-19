@@ -27,16 +27,13 @@ enum OtpPurpose {
   RESET_PASSWORD
 }
 
+// An exam's stored state. "Open", "closed" and "upcoming" are not stored: they follow from the
+// window (see examPhase in the shared package).
 enum ExamStatus {
   DRAFT
-  PAYMENT_PENDING
   PUBLISHED
-  LIVE
-  CLOSED
-  GRADING
   RESULTS_FINAL
-  CERT_PENDING_APPROVAL
-  CERT_RELEASED
+  CANCELLED
 }
 
 enum PaymentStatus {
@@ -108,6 +105,13 @@ model User {
   @@index([role])
 }
 
+// What happens when a student leaves the exam screen.
+enum StrikePolicy {
+  OFF
+  WARN
+  AUTO_SUBMIT
+}
+
 model Exam {
   id                  String     @id @default(uuid()) @db.Uuid
   examinerId          String     @db.Uuid
@@ -121,6 +125,9 @@ model Exam {
   passPercent         Float      @default(40)
   shuffleQuestions    Boolean    @default(true)
   shuffleOptions      Boolean    @default(true)
+  // OFF: events are only logged. WARN: strikes are counted and shown. AUTO_SUBMIT: submit at maxStrikes.
+  strikePolicy        StrikePolicy @default(AUTO_SUBMIT)
+  maxStrikes          Int        @default(3)
   // Certificate logo for this exam (private S3 key). Falls back to the trainer's default logo.
   logoKey             String?
   // Certificate settings (layout, colours, wording); null means the defaults.
@@ -165,6 +172,10 @@ model Question {
   explanation    String?
   // Subjective questions only: marking guidance for the grader.
   rubric         String?
+  // Bumped on every post-publish correction (text, answer key, dropped).
+  revision       Int          @default(0)
+  // Set when the trainer drops the question: everyone gets its full marks.
+  droppedAt      DateTime?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
@@ -188,6 +199,19 @@ model ExaminerProfile {
   payoutDetailsUpdatedAt  DateTime?
   payoutDetailsVerifiedAt DateTime?
   user                    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/// Failed sign-ins per (email, IP). Locks one pair, so a stranger cannot lock the real owner out
+/// from their own network.
+model LoginFailure {
+  email       String
+  ip          String
+  count       Int      @default(0)
+  lockedUntil DateTime?
+  updatedAt   DateTime @updatedAt
+
+  @@id([email, ip])
+  @@index([updatedAt])
 }
 
 model EmailOtp {
@@ -258,6 +282,8 @@ model Payment {
   refundedAt        DateTime?
   refundReason      String?
   refundId          String?
+  // Paid but nothing was delivered (no seat, exam deleted): needs a manual refund.
+  needsRefund       Boolean        @default(false)
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
 
@@ -289,6 +315,8 @@ model Enrollment {
   seatId    String?  @unique @db.Uuid
   // Set when the "your exam starts soon" email went out, so it is only sent once.
   reminderSentAt DateTime?
+  // Extra time for this student (accommodation), set by the trainer. Added to the exam duration.
+  extraMinutes Int @default(0)
   createdAt DateTime @default(now())
 
   exam    Exam     @relation(fields: [examId], references: [id], onDelete: Restrict)
@@ -359,6 +387,10 @@ model Attempt {
   percent       Float?
   passed        Boolean?
   gradedAt      DateTime?
+  // Last time the bound device talked to the server. A device silent for 5 minutes can be replaced.
+  lastSeenAt    DateTime?
+  // When the last strike was counted; the conditional update on it keeps strikes from doubling.
+  lastStrikeAt  DateTime?
 
   enrollment Enrollment       @relation(fields: [enrollmentId], references: [id], onDelete: Restrict)
   exam       Exam             @relation(fields: [examId], references: [id], onDelete: Restrict)
@@ -387,6 +419,11 @@ model Answer {
   // Coding questions: language of the source in `text`, and the sample-run budget used so far.
   language     String?
   runs         Int       @default(0)
+  // Highest client sequence number applied; older autosaves that arrive late are ignored.
+  clientSeq    BigInt    @default(0)
+  // Trainer's mark for a choice answer, with the reason. Wins over the automatic mark.
+  marksOverride  Float?
+  overrideReason String?
   lastRunAt    DateTime?
   updatedAt    DateTime  @updatedAt
 
@@ -529,6 +566,9 @@ model Certificate {
   verifyHash     String
   pdfKey         String?
   pdfError       String?
+  // Failed renders are retried a few times with a growing wait, then left for an admin.
+  pdfAttempts    Int               @default(0)
+  pdfNextAt      DateTime?
   approvedById   String?           @db.Uuid
   approvedAt     DateTime?
   rejectedAt     DateTime?

@@ -1,4 +1,5 @@
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { randomBytes } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import { type SeatDto, type SeatPreviewDto, type SeatsDto } from '@assessiq/shared';
 import { AuditService } from '../audit/audit.service';
@@ -58,6 +59,8 @@ export class SeatsService {
       examId: exam.id,
       bought: seats.length,
       redeemed: dto.filter((s) => s.status === 'REDEEMED').length,
+      unused: dto.filter((s) => s.status !== 'REDEEMED').length,
+      closed: exam.status !== 'PUBLISHED' || (exam.endsAt !== null && exam.endsAt <= new Date()),
       priceEachPaise: (await this.settings.get()).examJoinPaise,
       seats: dto,
     };
@@ -119,6 +122,82 @@ export class SeatsService {
       meta: { count: sent.length },
     });
     return this.list(user, examId);
+  }
+
+  private async ownedSeat(user: AuthUser, examId: string, seatId: string) {
+    const exam = await this.owned(user, examId);
+    const seat = UUID.test(seatId)
+      ? await this.prisma.seat.findFirst({
+          where: { id: seatId, pack: { examId: exam.id } },
+        })
+      : null;
+    if (!seat) throw new NotFoundException('Seat not found');
+    if (seat.redeemedAt) throw new ConflictException('This seat is already used');
+    return { exam, seat };
+  }
+
+  /** Changes who a seat is reserved for (a typo, a different student) and emails the new link. */
+  async reassign(user: AuthUser, examId: string, seatId: string, email: string): Promise<SeatsDto> {
+    const { exam, seat } = await this.ownedSeat(user, examId, seatId);
+    const taken = await this.prisma.seat.findFirst({
+      where: { id: { not: seat.id }, pack: { examId: exam.id }, email },
+    });
+    const joined = await this.prisma.enrollment.findFirst({
+      where: { examId: exam.id, student: { email: { equals: email, mode: 'insensitive' } } },
+    });
+    if (taken || joined) {
+      throw new ConflictException('That student already has a seat or has joined');
+    }
+    // Same token would let the old address use the link, so the seat gets a fresh one.
+    await this.prisma.seat.update({
+      where: { id: seat.id },
+      data: { email, token: randomBytes(20).toString('base64url') },
+    });
+    const fresh = await this.prisma.seat.findUniqueOrThrow({ where: { id: seat.id } });
+    const trainer = await this.prisma.user.findUniqueOrThrow({ where: { id: user.id } });
+    await this.mail.sendSeatInvite(email, {
+      examTitle: exam.title,
+      trainerName: trainer.name,
+      link: this.link(fresh.token),
+    });
+    await this.audit.log({
+      actorId: user.id,
+      action: 'seats.reassign',
+      entity: 'Seat',
+      entityId: seat.id,
+      meta: { from: seat.email, to: email },
+    });
+    return this.list(user, examId);
+  }
+
+  /** Frees a reserved seat so it can be given to someone else. The old link stops working. */
+  async unassign(user: AuthUser, examId: string, seatId: string): Promise<SeatsDto> {
+    const { seat } = await this.ownedSeat(user, examId, seatId);
+    await this.prisma.seat.update({
+      where: { id: seat.id },
+      data: { email: null, token: randomBytes(20).toString('base64url') },
+    });
+    await this.audit.log({
+      actorId: user.id,
+      action: 'seats.unassign',
+      entity: 'Seat',
+      entityId: seat.id,
+      meta: { was: seat.email },
+    });
+    return this.list(user, examId);
+  }
+
+  /** Sends the redeem link again to the student a seat is reserved for. */
+  async resend(user: AuthUser, examId: string, seatId: string): Promise<{ sent: true }> {
+    const { exam, seat } = await this.ownedSeat(user, examId, seatId);
+    if (!seat.email) throw new ConflictException('This seat is not reserved for anyone');
+    const trainer = await this.prisma.user.findUniqueOrThrow({ where: { id: user.id } });
+    await this.mail.sendSeatInvite(seat.email, {
+      examTitle: exam.title,
+      trainerName: trainer.name,
+      link: this.link(seat.token),
+    });
+    return { sent: true };
   }
 
   // ---------------------------------------------------------------- student

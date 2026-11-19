@@ -1,12 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import type {
-  AttemptAnswerDto,
-  AttemptDto,
-  ProctorEventType,
-  SaveAnswerInput,
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  AutosaveQueue,
+  type AttemptAnswerDto,
+  type AttemptDto,
+  type ProctorEventType,
+  type SaveAnswerInput,
+  type SendResult,
 } from '@assessiq/shared';
 import { CodeAnswer } from '../../components/code-answer';
 import { Alert, Button, useQueryParam } from '../../components/ui';
@@ -18,7 +20,8 @@ type SaveState = 'saved' | 'saving' | 'error';
 const END_TEXT: Record<string, string> = {
   SUBMITTED_BY_STUDENT: 'You submitted your exam.',
   TIME_UP: 'Time ran out, so your exam was submitted automatically.',
-  STRIKES: 'Your exam was submitted automatically after 3 warnings for leaving the exam screen.',
+  STRIKES:
+    'Your exam was submitted automatically after too many warnings for leaving the exam screen.',
 };
 
 function clock(totalSeconds: number): string {
@@ -50,9 +53,45 @@ export default function AttemptPage() {
   const [submitting, setSubmitting] = useState(false);
 
   const clockOffset = useRef(0);
-  const pending = useRef<Record<string, SaveAnswerInput>>({});
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ended = useRef(false);
+  const latest = useRef<Record<string, AttemptAnswerDto>>({});
+  const unsentEvents = useRef<ProctorEventType[]>([]);
+  const [unsaved, setUnsaved] = useState(0);
+
+  // One queue per attempt: a single save in flight, rising sequence numbers, and a copy of
+  // unsaved answers in localStorage so a refresh or crash while offline loses nothing.
+  const queue = useMemo(() => {
+    if (!attempt) return null;
+    const key = `aiq-pending-${attempt.id}`;
+    return new AutosaveQueue<AttemptAnswerDto>({
+      storage: {
+        get: () => window.localStorage.getItem(key),
+        set: (v) => window.localStorage.setItem(key, v),
+        remove: () => window.localStorage.removeItem(key),
+      },
+      send: async (qid, value, seq): Promise<SendResult> => {
+        const body: SaveAnswerInput = {
+          selected: value.selected,
+          text: value.text,
+          flagged: value.flagged,
+          seq,
+          ...(value.language ? { language: value.language as SaveAnswerInput['language'] } : {}),
+        };
+        try {
+          await api(`/attempts/${attempt.id}/answers/${qid}`, { method: 'PUT', body });
+          return 'ok';
+        } catch (err) {
+          if (err instanceof ApiError && err.status === 409) return 'ended';
+          if (err instanceof ApiError && err.code === 'DEVICE_MISMATCH') {
+            setFatal(err.message);
+            return 'fatal';
+          }
+          return 'retry';
+        }
+      },
+    });
+  }, [attempt?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---------------------------------------------------------------- loading
   useEffect(() => {
@@ -62,6 +101,7 @@ export default function AttemptPage() {
         clockOffset.current = new Date(a.serverTime).getTime() - Date.now();
         setAttempt(a);
         setAnswers(a.answers);
+        latest.current = a.answers;
         ended.current = a.status !== 'IN_PROGRESS';
       })
       .catch((err) =>
@@ -79,75 +119,91 @@ export default function AttemptPage() {
 
   // --------------------------------------------------------------- autosave
   const flush = useCallback(async () => {
-    if (!attempt) return;
-    const batch = pending.current;
-    pending.current = {};
-    const entries = Object.entries(batch);
-    if (entries.length === 0) return;
+    if (!queue) return 'saved' as const;
     setSaveState('saving');
-    let failed = false;
-    for (const [qid, patch] of entries) {
-      try {
-        await api(`/attempts/${attempt.id}/answers/${qid}`, { method: 'PUT', body: patch });
-      } catch (err) {
-        if (err instanceof ApiError && err.status === 409) {
-          // The attempt ended on the server (time up or strikes). Reload to show the result.
-          window.location.reload();
-          return;
-        }
-        if (err instanceof ApiError && err.code === 'DEVICE_MISMATCH') {
-          setFatal(err.message);
-          return;
-        }
-        failed = true;
-        // Put it back so the next flush retries; newer edits win.
-        pending.current[qid] = { ...patch, ...pending.current[qid] };
-      }
+    const res = await queue.flush();
+    setUnsaved(queue.size);
+    if (res === 'ended') {
+      window.location.reload();
+    } else if (res === 'failed') {
+      setSaveState('error');
+      timer.current = setTimeout(() => void flush(), 3000);
+    } else if (res === 'saved') {
+      setSaveState('saved');
     }
-    setSaveState(failed ? 'error' : 'saved');
-    if (failed) timer.current = setTimeout(() => void flush(), 3000);
-  }, [attempt]);
+    return res;
+  }, [queue]);
+
+  // Brings back answers typed while offline (before a refresh or crash), then saves them.
+  useEffect(() => {
+    if (!queue || !live) return;
+    const restored = queue.restore();
+    if (Object.keys(restored).length > 0) {
+      latest.current = { ...latest.current, ...restored };
+      setAnswers(latest.current);
+      setUnsaved(queue.size);
+      void flush();
+    }
+  }, [queue, live, flush]);
 
   const change = useCallback(
     (qid: string, patch: SaveAnswerInput) => {
-      setAnswers((prev) => {
-        const cur = prev[qid] ?? blank();
-        return {
-          ...prev,
-          [qid]: {
-            selected: patch.selected ?? cur.selected,
-            text: patch.text ?? cur.text,
-            language: patch.language ?? cur.language,
-            flagged: patch.flagged ?? cur.flagged,
-          },
-        };
-      });
-      pending.current[qid] = { ...pending.current[qid], ...patch };
+      if (!queue) return;
+      const cur = latest.current[qid] ?? blank();
+      const next: AttemptAnswerDto = {
+        selected: patch.selected ?? cur.selected,
+        text: patch.text ?? cur.text,
+        language: patch.language ?? cur.language,
+        flagged: patch.flagged ?? cur.flagged,
+      };
+      latest.current = { ...latest.current, [qid]: next };
+      setAnswers(latest.current);
+      // The whole answer is queued each time, so a late older save can never drop a newer field.
+      queue.set(qid, next);
+      setUnsaved(queue.size);
       setSaveState('saving');
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(() => void flush(), 500);
     },
-    [flush],
+    [queue, flush],
   );
 
   // ----------------------------------------------------------------- submit
-  const submit = useCallback(async () => {
-    if (!attempt || ended.current) return;
-    setSubmitting(true);
-    try {
-      if (timer.current) clearTimeout(timer.current);
-      await flush();
-      const done = await api<AttemptDto>(`/attempts/${attempt.id}/submit`, { method: 'POST' });
-      ended.current = true;
-      setAttempt(done);
-      if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
-    } catch {
-      setError('Could not submit. Check your connection and try again.');
-    } finally {
-      setSubmitting(false);
-      setConfirmSubmit(false);
-    }
-  }, [attempt, flush]);
+  const submit = useCallback(
+    async (timeUp = false) => {
+      if (!attempt || ended.current) return;
+      setSubmitting(true);
+      try {
+        if (timer.current) clearTimeout(timer.current);
+        const saved = queue ? await queue.flushWithRetries(3, 1000) : 'saved';
+        setUnsaved(queue?.size ?? 0);
+        if (saved === 'ended') {
+          window.location.reload();
+          return;
+        }
+        if (saved !== 'saved' && !timeUp) {
+          // Do not submit with answers the server does not have yet. The timer keeps running and
+          // the server submits at the deadline anyway.
+          setSaveState('error');
+          setError(
+            `Your last ${queue?.size ?? 0} answer(s) are not saved yet, so the exam was not submitted. Check your connection; we keep retrying.`,
+          );
+          timer.current = setTimeout(() => void flush(), 3000);
+          return;
+        }
+        const done = await api<AttemptDto>(`/attempts/${attempt.id}/submit`, { method: 'POST' });
+        ended.current = true;
+        setAttempt(done);
+        if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
+      } catch {
+        setError('Could not submit. Check your connection and try again.');
+      } finally {
+        setSubmitting(false);
+        setConfirmSubmit(false);
+      }
+    },
+    [attempt, flush, queue],
+  );
 
   // ------------------------------------------------------------------ timer
   useEffect(() => {
@@ -156,7 +212,7 @@ export default function AttemptPage() {
     const tick = () => {
       const left = Math.round((deadline - (Date.now() + clockOffset.current)) / 1000);
       setRemaining(left);
-      if (left <= 0 && !ended.current) void submit();
+      if (left <= 0 && !ended.current) void submit(true);
     };
     tick();
     const t = setInterval(tick, 1000);
@@ -167,26 +223,57 @@ export default function AttemptPage() {
   const report = useCallback(
     async (type: ProctorEventType) => {
       if (!attempt || ended.current) return;
+      const key = `aiq-events-${attempt.id}`;
+      const keep = () => {
+        try {
+          if (unsentEvents.current.length === 0) window.localStorage.removeItem(key);
+          else window.localStorage.setItem(key, JSON.stringify(unsentEvents.current));
+        } catch {
+          // Storage unavailable: events only live in memory.
+        }
+      };
+      if (unsentEvents.current.length === 0) {
+        try {
+          const stored = window.localStorage.getItem(key);
+          if (stored) unsentEvents.current = JSON.parse(stored);
+        } catch {
+          // ignore
+        }
+      }
+      unsentEvents.current.push(type);
+      if (unsentEvents.current.length > 200) unsentEvents.current.shift();
+      keep();
+      const batch = unsentEvents.current.slice(0, 50);
       try {
         const res = await api<{ strikes: number; ended: boolean }>(
-          `/attempts/${attempt.id}/events`,
+          batch.length === 1
+            ? `/attempts/${attempt.id}/events`
+            : `/attempts/${attempt.id}/events/batch`,
           {
             method: 'POST',
-            body: { type },
+            body:
+              batch.length === 1 ? { type: batch[0] } : { events: batch.map((t) => ({ type: t })) },
           },
         );
+        unsentEvents.current = unsentEvents.current.slice(batch.length);
+        keep();
         if (res.ended) {
           window.location.reload();
           return;
         }
         setAttempt((a) => (a ? { ...a, strikes: res.strikes } : a));
-        if (['TAB_HIDDEN', 'WINDOW_BLUR', 'FULLSCREEN_EXIT'].includes(type)) {
+        if (
+          attempt.strikePolicy !== 'OFF' &&
+          ['TAB_HIDDEN', 'WINDOW_BLUR', 'FULLSCREEN_EXIT'].includes(type)
+        ) {
           setWarning(
-            `Warning ${res.strikes} of ${attempt.maxStrikes}: stay on the exam screen. ${attempt.maxStrikes} warnings submit your exam automatically.`,
+            attempt.strikePolicy === 'AUTO_SUBMIT'
+              ? `Warning ${res.strikes} of ${attempt.maxStrikes}: stay on the exam screen. ${attempt.maxStrikes} warnings submit your exam automatically.`
+              : `Warning ${res.strikes}: please stay on the exam screen. Your trainer can see this.`,
           );
         }
       } catch {
-        // Offline: nothing to do; the next event will be reported.
+        // Offline: the event stays queued and goes out in a batch with the next one.
       }
     },
     [attempt],
@@ -194,8 +281,21 @@ export default function AttemptPage() {
 
   useEffect(() => {
     if (!live || !begun) return;
-    const onVisibility = () => document.hidden && void report('TAB_HIDDEN');
-    const onBlur = () => void report('WINDOW_BLUR');
+    // A blur shorter than this (a notification, a password-manager popup) is not reported.
+    let pendingAway: ReturnType<typeof setTimeout> | null = null;
+    const away = (type: ProctorEventType) => {
+      if (pendingAway) return;
+      pendingAway = setTimeout(() => {
+        pendingAway = null;
+        if (document.hidden || !document.hasFocus()) void report(type);
+      }, 1500);
+    };
+    const back = () => {
+      if (pendingAway) clearTimeout(pendingAway);
+      pendingAway = null;
+    };
+    const onVisibility = () => (document.hidden ? away('TAB_HIDDEN') : back());
+    const onBlur = () => away('WINDOW_BLUR');
     const onFullscreen = () => {
       const inFs = Boolean(document.fullscreenElement);
       setFullscreen(inFs);
@@ -221,6 +321,7 @@ export default function AttemptPage() {
     };
     document.addEventListener('visibilitychange', onVisibility);
     window.addEventListener('blur', onBlur);
+    window.addEventListener('focus', back);
     document.addEventListener('fullscreenchange', onFullscreen);
     document.addEventListener('copy', onCopy);
     document.addEventListener('cut', onCopy);
@@ -230,6 +331,8 @@ export default function AttemptPage() {
     return () => {
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('blur', onBlur);
+      window.removeEventListener('focus', back);
+      back();
       document.removeEventListener('fullscreenchange', onFullscreen);
       document.removeEventListener('copy', onCopy);
       document.removeEventListener('cut', onCopy);
@@ -242,18 +345,23 @@ export default function AttemptPage() {
   // Warn before closing the tab while answers are unsaved.
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
-      if (live && (saveState !== 'saved' || begun)) e.preventDefault();
+      if (live && (saveState !== 'saved' || unsaved > 0 || begun)) e.preventDefault();
     };
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
-  }, [live, saveState, begun]);
+  }, [live, saveState, unsaved, begun]);
 
   function begin() {
     // Do not wait for the browser: some refuse or never answer, and the exam must still start.
-    try {
-      void document.documentElement.requestFullscreen()?.catch(() => undefined);
-    } catch {
-      // Fullscreen unsupported: the exam proceeds without it.
+    if (typeof document.documentElement.requestFullscreen === 'function') {
+      try {
+        void document.documentElement.requestFullscreen()?.catch(() => undefined);
+      } catch {
+        // Refused: the exam proceeds without it.
+      }
+    } else {
+      // iOS Safari and some tablets have no full screen. Note it for the trainer, never penalise.
+      void report('FULLSCREEN_UNSUPPORTED');
     }
     setBegun(true);
   }
@@ -314,14 +422,29 @@ export default function AttemptPage() {
             {attempt.questions.length} questions · {attempt.exam.durationMinutes} minutes · your
             timer is already running
           </p>
+          {remaining !== null && remaining < attempt.exam.durationMinutes * 60 - 60 && (
+            <Alert kind="info">
+              You have {Math.max(0, Math.ceil(remaining / 60))} minutes left, less than the full{' '}
+              {attempt.exam.durationMinutes}, because the exam closes at{' '}
+              {new Date(attempt.deadlineAt).toLocaleTimeString([], {
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
+              .
+            </Alert>
+          )}
           {attempt.exam.instructions && (
             <p style={{ whiteSpace: 'pre-wrap' }}>{attempt.exam.instructions}</p>
           )}
           <Alert kind="info">
-            The exam runs full screen. Leaving the screen, switching tabs or windows counts as a
-            warning, and {attempt.maxStrikes} warnings submit your exam automatically. Copy, paste
-            and right-click are disabled. You have {attempt.strikes} warning
-            {attempt.strikes === 1 ? '' : 's'} so far.
+            {attempt.strikePolicy === 'AUTO_SUBMIT' &&
+              `The exam runs full screen. Leaving the screen, switching tabs or windows counts as a warning, and ${attempt.maxStrikes} warnings submit your exam automatically. You have ${attempt.strikes} warning${attempt.strikes === 1 ? '' : 's'} so far.`}
+            {attempt.strikePolicy === 'WARN' &&
+              `The exam runs full screen. Leaving the screen or switching tabs gives you a warning and your trainer sees the count, but it will not submit your exam. You have ${attempt.strikes} warning${attempt.strikes === 1 ? '' : 's'} so far.`}
+            {attempt.strikePolicy === 'OFF' &&
+              'Your trainer is told if you leave the exam screen or switch tabs. There are no warnings and nothing is submitted for you.'}{' '}
+            Copy, paste and right-click are disabled. Very short interruptions, like a notification,
+            are ignored.
           </Alert>
           <Button onClick={begin}>{attempt.questions.length ? 'Begin exam' : 'Continue'}</Button>
         </section>
@@ -345,9 +468,12 @@ export default function AttemptPage() {
                 ? 'Not saved, retrying…'
                 : 'All saved'}
           </span>
-          <span className="badge">
-            Warnings {attempt.strikes}/{attempt.maxStrikes}
-          </span>
+          {attempt.strikePolicy !== 'OFF' && (
+            <span className="badge">
+              Warnings {attempt.strikes}
+              {attempt.strikePolicy === 'AUTO_SUBMIT' ? `/${attempt.maxStrikes}` : ''}
+            </span>
+          )}
           <span
             className="badge"
             style={{
@@ -534,7 +660,7 @@ export default function AttemptPage() {
               . You cannot change your answers after submitting.
             </p>
             <div className="toolbar">
-              <Button loading={submitting} onClick={submit}>
+              <Button loading={submitting} onClick={() => void submit()}>
                 Yes, submit
               </Button>
               <Button variant="secondary" onClick={() => setConfirmSubmit(false)}>

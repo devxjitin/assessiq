@@ -166,6 +166,30 @@ export function ResultsPanel({
     }
   }
 
+  /** Add time to a running attempt, or reopen a finished one. Both ask for minutes and a reason. */
+  async function adjust(attemptId: string, name: string, kind: 'add-time' | 'reopen') {
+    const minutes = Number(
+      window.prompt(
+        kind === 'add-time'
+          ? `How many minutes to add for ${name}?`
+          : `Reopen ${name}'s attempt for how many minutes? Written and code marks for this student are cleared, because they may change their answers.`,
+        kind === 'add-time' ? '10' : '30',
+      ),
+    );
+    if (!Number.isFinite(minutes) || minutes < 1) return;
+    const reason = window.prompt('Why? (kept on the record, at least 5 characters)');
+    if (!reason || reason.trim().length < 5) return;
+    try {
+      await api(`/exams/${exam.id}/attempts/${attemptId}/${kind}`, {
+        method: 'POST',
+        body: { minutes: Math.round(minutes), reason: reason.trim() },
+      });
+      await load();
+    } catch (err) {
+      setError(describeError(err).message);
+    }
+  }
+
   async function release(attemptId: string, name: string) {
     if (
       !window.confirm(
@@ -304,12 +328,33 @@ export function ResultsPanel({
                   </td>
                   <td>
                     {r.status === 'IN_PROGRESS' && (
-                      <Button
-                        variant="secondary"
-                        onClick={() => void release(r.attemptId, r.studentName)}
-                      >
-                        Release device
-                      </Button>
+                      <>
+                        <Button
+                          variant="secondary"
+                          small
+                          onClick={() => void release(r.attemptId, r.studentName)}
+                        >
+                          Release device
+                        </Button>{' '}
+                        <Button
+                          variant="secondary"
+                          small
+                          onClick={() => void adjust(r.attemptId, r.studentName, 'add-time')}
+                        >
+                          Add time
+                        </Button>
+                      </>
+                    )}
+                    {r.status !== 'IN_PROGRESS' && !data.finalized && (
+                      <>
+                        <Button
+                          variant="secondary"
+                          small
+                          onClick={() => void adjust(r.attemptId, r.studentName, 'reopen')}
+                        >
+                          Reopen
+                        </Button>{' '}
+                      </>
                     )}
                     {r.status !== 'IN_PROGRESS' && (
                       <Link

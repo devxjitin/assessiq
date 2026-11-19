@@ -93,6 +93,15 @@ export default function AdminPaymentsPage() {
       <PageHeader title="Payments" subtitle="Find a payment and refund it." />
       {error && <Alert>{error}</Alert>}
       {note && <Alert kind="success">{note}</Alert>}
+      {rows && rows.some((p) => p.needsRefund && p.status === 'CAPTURED') && (
+        <Alert>
+          Needs a refund (paid, nothing delivered):{' '}
+          {rows
+            .filter((p) => p.needsRefund && p.status === 'CAPTURED')
+            .map((p) => `${p.receiptNo} ${rupees(p.amountPaise)} ${p.userEmail}`)
+            .join(' · ')}
+        </Alert>
+      )}
       <section className="card">
         <div className="toolbar" style={{ marginBottom: 12 }}>
           <input
@@ -156,6 +165,11 @@ export default function AdminPaymentsPage() {
                         status={STATUS_KIND[p.status]}
                         label={p.status === 'CAPTURED' ? 'paid' : p.status.toLowerCase()}
                       />
+                      {p.needsRefund && p.status === 'CAPTURED' && (
+                        <div className="muted" style={{ color: 'var(--danger, #b00020)' }}>
+                          needs refund
+                        </div>
+                      )}
                       {p.refundReason && <div className="muted">{p.refundReason}</div>}
                     </td>
                     <td>

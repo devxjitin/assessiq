@@ -69,6 +69,8 @@ export class ExamsService {
         passPercent: input.passPercent,
         shuffleQuestions: input.shuffleQuestions,
         shuffleOptions: input.shuffleOptions,
+        strikePolicy: input.strikePolicy,
+        maxStrikes: input.maxStrikes,
         certificate: {
           ...DEFAULT_CERT_TEMPLATE,
           enabled: input.certificatesEnabled,
@@ -107,6 +109,53 @@ export class ExamsService {
     return this.toDetail(await this.findOwned(user, examId));
   }
 
+  /**
+   * A new draft with the same settings, questions and certificate design. It has no code, no
+   * payment and no dates (a new window is needed to publish), and does not share the logo file.
+   */
+  async duplicate(user: AuthUser, examId: string): Promise<ExamDetailDto> {
+    const source = await this.findOwned(user, examId);
+    const copy = await this.prisma.exam.create({
+      data: {
+        examinerId: user.id,
+        title: `Copy of ${source.title}`.slice(0, 200),
+        description: source.description,
+        instructions: source.instructions,
+        durationMinutes: source.durationMinutes,
+        passPercent: source.passPercent,
+        shuffleQuestions: source.shuffleQuestions,
+        shuffleOptions: source.shuffleOptions,
+        strikePolicy: source.strikePolicy,
+        maxStrikes: source.maxStrikes,
+        certificate: (source.certificate ?? undefined) as Prisma.InputJsonValue | undefined,
+        questions: {
+          create: source.questions.map((q) => ({
+            position: q.position,
+            type: q.type,
+            body: q.body,
+            options: q.options,
+            correctOptions: q.correctOptions,
+            marks: q.marks,
+            negativeMarks: q.negativeMarks,
+            partialCredit: q.partialCredit,
+            coding: (q.coding ?? undefined) as Prisma.InputJsonValue | undefined,
+            explanation: q.explanation,
+            rubric: q.rubric,
+          })),
+        },
+      },
+      include: { questions: { orderBy: { position: 'asc' } } },
+    });
+    await this.audit.log({
+      actorId: user.id,
+      action: 'exam.duplicate',
+      entity: 'Exam',
+      entityId: copy.id,
+      meta: { from: source.id },
+    });
+    return this.toDetail(copy);
+  }
+
   async update(user: AuthUser, examId: string, input: UpdateExamInput): Promise<ExamDetailDto> {
     const exam = await this.findOwned(user, examId);
     this.assertDraft(exam);
@@ -140,6 +189,8 @@ export class ExamsService {
         passPercent: input.passPercent,
         shuffleQuestions: input.shuffleQuestions,
         shuffleOptions: input.shuffleOptions,
+        strikePolicy: input.strikePolicy,
+        maxStrikes: input.maxStrikes,
       },
       include: { questions: { orderBy: { position: 'asc' } } },
     });
@@ -458,6 +509,8 @@ export class ExamsService {
       coding: (q.coding as unknown as CodingSpec | null) ?? null,
       explanation: q.explanation,
       rubric: q.rubric,
+      dropped: q.droppedAt !== null,
+      revision: q.revision,
     };
   }
 
@@ -484,6 +537,8 @@ export class ExamsService {
       passPercent: exam.passPercent,
       shuffleQuestions: exam.shuffleQuestions,
       shuffleOptions: exam.shuffleOptions,
+      strikePolicy: exam.strikePolicy,
+      maxStrikes: exam.maxStrikes,
       certificatesEnabled:
         certificateTemplateSchema.safeParse(exam.certificate ?? {}).data?.enabled ?? true,
       hasLogo: Boolean(exam.logoKey),

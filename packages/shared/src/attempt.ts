@@ -12,6 +12,8 @@ export const saveAnswerSchema = z
     /** Coding questions: the language the text is written in. */
     language: z.enum(CODE_LANGUAGE_KEYS).optional(),
     flagged: z.boolean().optional(),
+    /** Client counter that only goes up; the server ignores a write older than what it holds. */
+    seq: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).optional(),
   })
   .refine((v) => v.selected !== undefined || v.text !== undefined || v.flagged !== undefined, {
     message: 'Nothing to save',
@@ -27,6 +29,8 @@ export const PROCTOR_EVENTS = [
   'PASTE',
   'CONTEXT_MENU',
   'DEVTOOLS_KEY',
+  /** Info only: this browser cannot go full screen (iOS Safari), so it is not held against the student. */
+  'FULLSCREEN_UNSUPPORTED',
 ] as const;
 export type ProctorEventType = (typeof PROCTOR_EVENTS)[number];
 
@@ -39,6 +43,12 @@ export const STRIKE_EVENTS: readonly ProctorEventType[] = [
 
 export const proctorEventSchema = z.object({ type: z.enum(PROCTOR_EVENTS) });
 export type ProctorEventInput = z.infer<typeof proctorEventSchema>;
+
+/** Events that could not be sent while offline, sent together later. */
+export const proctorEventBatchSchema = z.object({
+  events: z.array(proctorEventSchema).min(1).max(50),
+});
+export type ProctorEventBatchInput = z.infer<typeof proctorEventBatchSchema>;
 
 export type JoinState = 'OPEN' | 'NOT_STARTED' | 'ENDED' | 'ALREADY_ENROLLED';
 
@@ -112,6 +122,7 @@ export interface AttemptDto {
   deadlineAt: string;
   strikes: number;
   maxStrikes: number;
+  strikePolicy: 'OFF' | 'WARN' | 'AUTO_SUBMIT';
   exam: { title: string; instructions: string | null; durationMinutes: number };
   /** Empty once the attempt has ended. */
   questions: AttemptQuestionDto[];

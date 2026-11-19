@@ -36,6 +36,8 @@ export interface ExamSettingsValues {
   passPercent: number;
   shuffleQuestions: boolean;
   shuffleOptions: boolean;
+  strikePolicy: 'OFF' | 'WARN' | 'AUTO_SUBMIT';
+  maxStrikes: number;
   certificatesEnabled?: boolean;
 }
 
@@ -66,6 +68,8 @@ export function ExamSettingsForm({
       passPercent: toNumber(f.get('passPercent')),
       shuffleQuestions: f.get('shuffleQuestions') === 'on',
       shuffleOptions: f.get('shuffleOptions') === 'on',
+      strikePolicy: String(f.get('strikePolicy') ?? 'AUTO_SUBMIT'),
+      maxStrikes: toNumber(f.get('maxStrikes')),
       certificatesEnabled: f.get('certificatesEnabled') === 'on',
     };
     const result = validate(initial ? updateExamFormSchema : createExamSchema, candidate);
@@ -227,6 +231,32 @@ export function ExamSettingsForm({
             defaultChecked={initial?.shuffleOptions ?? true}
           />
           Shuffle answer options
+        </label>
+      </section>
+
+      <section className="form-section">
+        <h3>Leaving the exam screen</h3>
+        <p className="card-sub">
+          What happens when a student switches tabs or windows. Very short blurs, like a
+          notification, are ignored. Phones that cannot go full screen are never penalised for that.
+        </p>
+        <label>
+          Policy
+          <select name="strikePolicy" defaultValue={initial?.strikePolicy ?? 'AUTO_SUBMIT'}>
+            <option value="AUTO_SUBMIT">Submit the exam automatically after the limit</option>
+            <option value="WARN">Warn the student and show you the count, never submit</option>
+            <option value="OFF">Only record it for you, no warnings</option>
+          </select>
+        </label>
+        <label>
+          Warnings before automatic submit (1 to 10)
+          <input
+            type="number"
+            name="maxStrikes"
+            min={1}
+            max={10}
+            defaultValue={initial?.maxStrikes ?? 3}
+          />
         </label>
       </section>
 

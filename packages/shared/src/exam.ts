@@ -47,6 +47,8 @@ const examSettings = {
     .max(100, 'Pass mark cannot be above 100%'),
   shuffleQuestions: z.boolean(),
   shuffleOptions: z.boolean(),
+  strikePolicy: z.enum(['OFF', 'WARN', 'AUTO_SUBMIT']),
+  maxStrikes: z.number().int().min(1, 'At least 1').max(10, 'At most 10'),
 };
 
 const windowIsValid = (v: { startsAt?: string | null; endsAt?: string | null }) =>
@@ -61,6 +63,8 @@ export const createExamSchema = z
     passPercent: examSettings.passPercent.default(40),
     shuffleQuestions: examSettings.shuffleQuestions.default(true),
     shuffleOptions: examSettings.shuffleOptions.default(true),
+    strikePolicy: examSettings.strikePolicy.default('AUTO_SUBMIT'),
+    maxStrikes: examSettings.maxStrikes.default(3),
     /** Decided once, when the exam is created. Off = no certificate tab, no certificates. */
     certificatesEnabled: z.boolean().default(true),
   })
@@ -187,6 +191,10 @@ export interface ExamQuestionDto {
   coding: CodingSpec | null;
   explanation: string | null;
   rubric: string | null;
+  /** Set when the trainer dropped the question: everyone gets its full marks. */
+  dropped: boolean;
+  /** Number of corrections made after publishing. */
+  revision: number;
 }
 
 export interface ExamSummaryDto {
@@ -210,6 +218,8 @@ export interface ExamDetailDto extends ExamSummaryDto {
   passPercent: number;
   shuffleQuestions: boolean;
   shuffleOptions: boolean;
+  strikePolicy: 'OFF' | 'WARN' | 'AUTO_SUBMIT';
+  maxStrikes: number;
   certificatesEnabled: boolean;
   hasLogo: boolean;
   /** Share code; set once the creation fee is paid. */

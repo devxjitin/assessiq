@@ -9,6 +9,7 @@ import {
   type SimilarityReportDto,
   type CodeSubmissionDto,
   type GradedTest,
+  type AttemptHistoryDto,
   type AttemptRowDto,
   type ExamResultsDto,
   type GradeAnswerInput,
@@ -103,6 +104,7 @@ export class ResultsService {
     }
     const enrolled = await this.prisma.enrollment.count({ where: { examId: exam.id } });
 
+    const droppedIds = new Set(exam.questions.filter((q) => q.droppedAt).map((q) => q.id));
     const rows: AttemptRowDto[] = attempts.map((a) => ({
       attemptId: a.id,
       studentName: a.student.name,
@@ -113,7 +115,9 @@ export class ResultsService {
       submittedAt: a.submittedAt?.toISOString() ?? null,
       strikes: a.strikes,
       violations: a._count.events,
-      pendingGrading: a.answers.filter((x) => x.text?.trim() && x.marksAwarded === null).length,
+      pendingGrading: a.answers.filter(
+        (x) => x.text?.trim() && x.marksAwarded === null && !droppedIds.has(x.questionId),
+      ).length,
       flags: integrityFlags({
         hasDeviceId: Boolean(a.deviceId),
         sharedDeviceCount: a.deviceId ? (devices.get(a.deviceId) ?? 1) - 1 : 0,
@@ -217,6 +221,7 @@ export class ResultsService {
         at: e.createdAt.toISOString(),
         ip: e.ip,
       })),
+      history: await this.history(attempt.id),
       integrity,
       finalized: exam.status === 'RESULTS_FINAL',
       result:
@@ -248,11 +253,52 @@ export class ResultsService {
           // null means "still waiting for the trainer"; a blank written answer is simply 0.
           language: a?.language ?? null,
           submission: toSubmission(jobs.get(q.id)),
-          marksAwarded: a?.marksAwarded ?? (!written || blankWritten ? 0 : null),
+          marksAwarded: q.droppedAt
+            ? q.marks
+            : (a?.marksAwarded ?? (!written || blankWritten ? 0 : null)),
           feedback: a?.feedback ?? null,
+          dropped: q.droppedAt !== null,
+          override:
+            a?.marksOverride != null
+              ? { marks: a.marksOverride, reason: a.overrideReason ?? '' }
+              : null,
         };
       }),
     };
+  }
+
+  /** Time added, reopenings and device releases for one attempt, from the audit log. */
+  private async history(attemptId: string): Promise<AttemptHistoryDto[]> {
+    const rows = await this.prisma.auditLog.findMany({
+      where: {
+        entity: 'Attempt',
+        entityId: attemptId,
+        action: {
+          in: [
+            'attempt.add_time',
+            'attempt.reopen',
+            'attempt.device.release',
+            'attempt.device.auto_release',
+          ],
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+    const kinds: Record<string, AttemptHistoryDto['action']> = {
+      'attempt.add_time': 'ADD_TIME',
+      'attempt.reopen': 'REOPEN',
+      'attempt.device.release': 'DEVICE_RELEASED',
+      'attempt.device.auto_release': 'DEVICE_AUTO_RELEASED',
+    };
+    return rows.map((r) => {
+      const meta = (r.meta ?? {}) as { reason?: string; minutes?: number };
+      return {
+        action: kinds[r.action],
+        at: r.createdAt.toISOString(),
+        reason: meta.reason ?? null,
+        minutes: meta.minutes ?? null,
+      };
+    });
   }
 
   async gradeAnswer(
@@ -335,16 +381,20 @@ export class ResultsService {
       );
     }
 
-    await this.prisma.$transaction([
-      this.prisma.exam.update({
-        where: { id: exam.id },
+    // Only the call that flips PUBLISHED -> RESULTS_FINAL goes on to send emails and certificates.
+    const claimed = await this.prisma.$transaction(async (tx) => {
+      const won = await tx.exam.updateMany({
+        where: { id: exam.id, status: 'PUBLISHED' },
         data: { status: 'RESULTS_FINAL', resultsPublishedAt: new Date() },
-      }),
-      this.prisma.attempt.updateMany({
+      });
+      if (won.count === 0) return false;
+      await tx.attempt.updateMany({
         where: { examId: exam.id, status: 'GRADED' },
         data: { status: 'RESULT_PUBLISHED' },
-      }),
-    ]);
+      });
+      return true;
+    });
+    if (!claimed) throw new ConflictException('Results are already published');
     await this.audit.log({
       actorId: user.id,
       action: 'exam.results.publish',
@@ -533,9 +583,10 @@ export class ResultsService {
             language: a?.language ?? null,
             submission: toSubmission(jobs.get(id)),
             marks: q.marks,
-            marksAwarded: a?.marksAwarded ?? 0,
+            marksAwarded: q.droppedAt ? q.marks : (a?.marksAwarded ?? 0),
             explanation: q.explanation,
             feedback: a?.feedback ?? null,
+            dropped: q.droppedAt !== null,
           },
         ];
       }),

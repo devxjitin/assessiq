@@ -146,6 +146,36 @@ describe('answering', () => {
     );
   });
 
+  it('ignores a late older save and accepts newer ones', async () => {
+    const a = await begin();
+    const q = exam.questionIds.single;
+    await put(a.id, q, { selected: [1], seq: 20 }).expect(200);
+    await put(a.id, q, { selected: [3], seq: 10 }).expect(200); // older, arrives late
+    let r = (await ctx.http().get(`/attempts/${a.id}`).set(auth(sam)).expect(200)).body;
+    expect(r.answers[q].selected).toEqual([1]);
+    await put(a.id, q, { selected: [2], seq: 30 }).expect(200);
+    r = (await ctx.http().get(`/attempts/${a.id}`).set(auth(sam)).expect(200)).body;
+    expect(r.answers[q].selected).toEqual([2]);
+  });
+
+  it('records a batch of queued proctor events', async () => {
+    const a = await begin();
+    const res = await ctx
+      .http()
+      .post(`/attempts/${a.id}/events/batch`)
+      .set(auth(sam))
+      .send({ events: [{ type: 'COPY' }, { type: 'PASTE' }] })
+      .expect(200);
+    expect(res.body.ended).toBeFalsy();
+    expect(await ctx.prisma.proctorEvent.count({ where: { attemptId: a.id } })).toBe(2);
+    await ctx
+      .http()
+      .post(`/attempts/${a.id}/events/batch`)
+      .set(auth(sam))
+      .send({ events: [] })
+      .expect(400);
+  });
+
   it('rejects impossible answers', async () => {
     const a = await begin();
     await put(a.id, exam.questionIds.single, { selected: [0, 1] }).expect(409);
@@ -232,8 +262,14 @@ describe('finishing', () => {
 describe('proctoring', () => {
   const event = (attemptId: string, type: string) =>
     ctx.http().post(`/attempts/${attemptId}/events`).set(auth(sam)).send({ type });
-  const ageEvents = () =>
-    ctx.prisma.proctorEvent.updateMany({ data: { createdAt: new Date(Date.now() - 10_000) } });
+  const ageEvents = async () => {
+    const past = new Date(Date.now() - 10_000);
+    await ctx.prisma.proctorEvent.updateMany({ data: { createdAt: past } });
+    await ctx.prisma.attempt.updateMany({
+      where: { lastStrikeAt: { not: null } },
+      data: { lastStrikeAt: past },
+    });
+  };
 
   it('counts a strike, merges events that fire together, and only logs copy/paste', async () => {
     const a = await begin();
@@ -267,6 +303,71 @@ describe('proctoring', () => {
       .expect(409);
     // Events after the end change nothing.
     expect((await event(a.id, 'TAB_HIDDEN').expect(200)).body.ended).toBe(true);
+  });
+
+  /** A fresh exam with its own strike policy, joined and started by Sam. */
+  async function withPolicy(settings: object) {
+    const e = await publishExam(ctx, trainer, settings);
+    const enr = await joinExam(ctx, sam, e.code);
+    const a = (await start(sam, enr).expect(200)).body as { id: string };
+    return a.id;
+  }
+
+  it('counts concurrent events as one strike', async () => {
+    const a = await begin();
+    await Promise.all([
+      event(a.id, 'TAB_HIDDEN'),
+      event(a.id, 'WINDOW_BLUR'),
+      event(a.id, 'FULLSCREEN_EXIT'),
+    ]);
+    const row = await ctx.prisma.attempt.findUnique({ where: { id: a.id } });
+    expect(row?.strikes).toBe(1);
+  });
+
+  it('does not count a browser without full screen as a strike', async () => {
+    const a = await begin();
+    expect((await event(a.id, 'FULLSCREEN_UNSUPPORTED').expect(200)).body.strikes).toBe(0);
+  });
+
+  it('AUTO_SUBMIT honours the exam limit', async () => {
+    const id = await withPolicy({ strikePolicy: 'AUTO_SUBMIT', maxStrikes: 2 });
+    await event(id, 'TAB_HIDDEN').expect(200);
+    await ageEvents();
+    const last = (await event(id, 'TAB_HIDDEN').expect(200)).body;
+    expect(last).toMatchObject({ strikes: 2, ended: true, status: 'AUTO_SUBMITTED' });
+  });
+
+  it('WARN counts strikes but never submits', async () => {
+    const id = await withPolicy({ strikePolicy: 'WARN', maxStrikes: 1 });
+    for (let i = 0; i < 4; i++) {
+      await event(id, 'TAB_HIDDEN').expect(200);
+      await ageEvents();
+    }
+    const row = await ctx.prisma.attempt.findUnique({ where: { id } });
+    expect(row).toMatchObject({ strikes: 4, status: 'IN_PROGRESS' });
+  });
+
+  it('OFF only records the events', async () => {
+    const id = await withPolicy({ strikePolicy: 'OFF' });
+    for (let i = 0; i < 3; i++) {
+      await event(id, 'TAB_HIDDEN').expect(200);
+      await ageEvents();
+    }
+    const row = await ctx.prisma.attempt.findUnique({ where: { id } });
+    expect(row).toMatchObject({ strikes: 0, status: 'IN_PROGRESS' });
+    expect(await ctx.prisma.proctorEvent.count({ where: { attemptId: id } })).toBe(3);
+  });
+
+  it('shows the policy to the student and validates the limit', async () => {
+    const id = await withPolicy({ strikePolicy: 'WARN', maxStrikes: 5 });
+    const view = (await ctx.http().get(`/attempts/${id}`).set(auth(sam)).expect(200)).body;
+    expect(view).toMatchObject({ strikePolicy: 'WARN', maxStrikes: 5 });
+    await ctx
+      .http()
+      .post('/exams')
+      .set(auth(trainer))
+      .send({ title: 'Bad limit', maxStrikes: 11 })
+      .expect(400);
   });
 
   it('rejects unknown event types', async () => {

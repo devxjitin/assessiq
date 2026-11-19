@@ -33,6 +33,11 @@ export class GradingService {
 
     for (const q of questions) {
       const a = byQuestion.get(q.id);
+      if (q.droppedAt) {
+        // Dropped by the trainer: full marks for everyone, nothing to read or judge.
+        awarded.push(q.marks);
+        continue;
+      }
       if (q.type !== 'SINGLE' && q.type !== 'MULTI') {
         // Written answers (coding questions will join them in a later sprint).
 
@@ -70,12 +75,14 @@ export class GradingService {
         },
         a?.selected ?? [],
       );
-      awarded.push(g.marks);
-      if (a && a.marksAwarded !== g.marks) {
+      // A mark the trainer set by hand wins over the automatic one.
+      const marks = a?.marksOverride ?? g.marks;
+      awarded.push(marks);
+      if (a && a.marksAwarded !== marks) {
         writes.push(
           this.prisma.answer.update({
             where: { id: a.id },
-            data: { marksAwarded: g.marks, gradedAt: now },
+            data: { marksAwarded: marks, gradedAt: now },
           }),
         );
       }

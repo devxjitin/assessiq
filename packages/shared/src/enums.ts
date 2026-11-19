@@ -15,14 +15,9 @@ export type QuestionType = (typeof QuestionType)[keyof typeof QuestionType];
 
 export const ExamStatus = {
   DRAFT: 'DRAFT',
-  PAYMENT_PENDING: 'PAYMENT_PENDING',
   PUBLISHED: 'PUBLISHED',
-  LIVE: 'LIVE',
-  CLOSED: 'CLOSED',
-  GRADING: 'GRADING',
   RESULTS_FINAL: 'RESULTS_FINAL',
-  CERT_PENDING_APPROVAL: 'CERT_PENDING_APPROVAL',
-  CERT_RELEASED: 'CERT_RELEASED',
+  CANCELLED: 'CANCELLED',
 } as const;
 export type ExamStatus = (typeof ExamStatus)[keyof typeof ExamStatus];
 

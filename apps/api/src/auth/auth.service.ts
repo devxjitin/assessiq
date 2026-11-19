@@ -70,6 +70,27 @@ export class AuthService {
       if (existing.emailVerifiedAt) {
         await this.mail.sendAccountExists(existing.email, existing.name);
       } else {
+        // Unverified: whoever registered first has not proven they own the mailbox. Replace the
+        // stored credentials with this request's, so a squatter's password cannot survive the
+        // real owner verifying the code that is emailed to them.
+        await this.prisma.user.update({
+          where: { id: existing.id },
+          data: {
+            passwordHash: await this.passwords.hash(input.password),
+            name: input.name,
+            phone: input.phone,
+            role: input.role,
+          },
+        });
+        if (input.role === 'EXAMINER') {
+          await this.prisma.examinerProfile.upsert({
+            where: { userId: existing.id },
+            create: { userId: existing.id, orgName: input.orgName ?? null },
+            update: { orgName: input.orgName ?? null },
+          });
+        } else {
+          await this.prisma.examinerProfile.deleteMany({ where: { userId: existing.id } });
+        }
         await this.sendCode(existing, 'VERIFY_EMAIL');
       }
       return;
@@ -134,6 +155,17 @@ export class AuthService {
   }
 
   async login(input: LoginInput, meta: RequestMeta): Promise<Session> {
+    const ip = meta.ip ?? 'unknown';
+    const pair = await this.prisma.loginFailure.findUnique({
+      where: { email_ip: { email: input.email, ip } },
+    });
+    if (pair?.lockedUntil && pair.lockedUntil > new Date()) {
+      throw new HttpException(
+        'Too many failed attempts. Try again later or reset your password.',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
     const user = await this.prisma.user.findUnique({
       where: { email: input.email },
       include: { examinerProfile: true },
@@ -141,6 +173,7 @@ export class AuthService {
 
     if (!user) {
       await this.passwords.verifyDummy(input.password);
+      await this.recordPairFailure(input.email, ip);
       throw new UnauthorizedException('Invalid email or password');
     }
 
@@ -153,6 +186,7 @@ export class AuthService {
 
     const passwordOk = await this.passwords.verify(user.passwordHash, input.password);
     if (!passwordOk) {
+      await this.recordPairFailure(input.email, ip);
       await this.recordFailedLogin(user, meta);
       throw new UnauthorizedException('Invalid email or password');
     }
@@ -175,6 +209,7 @@ export class AuthService {
       where: { id: user.id },
       data: { failedLoginCount: 0, lockedUntil: null },
     });
+    await this.prisma.loginFailure.deleteMany({ where: { email: input.email, ip } });
     await this.audit.log({
       actorId: user.id,
       action: 'auth.login',
@@ -265,9 +300,24 @@ export class AuthService {
     return this.startSession(user, meta);
   }
 
+  /** Counts a failure for this email from this IP and locks the pair after too many. */
+  private async recordPairFailure(email: string, ip: string): Promise<void> {
+    const row = await this.prisma.loginFailure.upsert({
+      where: { email_ip: { email, ip } },
+      create: { email, ip, count: 1 },
+      update: { count: { increment: 1 } },
+    });
+    if (row.count >= this.env.LOGIN_MAX_FAILURES) {
+      await this.prisma.loginFailure.update({
+        where: { email_ip: { email, ip } },
+        data: { count: 0, lockedUntil: new Date(Date.now() + this.env.LOCK_MINUTES * 60_000) },
+      });
+    }
+  }
+
   private async recordFailedLogin(user: User, meta: RequestMeta): Promise<void> {
     const failures = user.failedLoginCount + 1;
-    const lock = failures >= this.env.LOGIN_MAX_FAILURES;
+    const lock = failures >= this.env.ACCOUNT_LOCK_FAILURES;
     await this.prisma.user.update({
       where: { id: user.id },
       data: {

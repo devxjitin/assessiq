@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import type { ExamSummaryDto } from '@assessiq/shared';
-import { Alert, PageHeader, Shell, StatusBadge } from '../../components/ui';
+import { Alert, Button, PageHeader, Shell, StatusBadge, describeError } from '../../components/ui';
 import { api } from '../../lib/api';
 import { useRequireAuth } from '../../lib/auth';
 
@@ -18,6 +18,16 @@ export default function ExamsPage() {
       .then(setExams)
       .catch(() => setError('Could not load your exams.'));
   }, [user]);
+
+  async function duplicate(id: string) {
+    setError('');
+    try {
+      const copy = await api<{ id: string }>(`/exams/${id}/duplicate`, { method: 'POST' });
+      window.location.href = `/exams/edit/?id=${copy.id}`;
+    } catch (err) {
+      setError(describeError(err).message);
+    }
+  }
 
   if (loading || !user) {
     return (
@@ -76,12 +86,17 @@ export default function ExamsPage() {
                     <td>{e.totalMarks}</td>
                     <td>{e.durationMinutes} min</td>
                     <td>
-                      <Link
-                        className="btn btn-secondary btn-small btn-link"
-                        href={`/exams/edit/?id=${e.id}`}
-                      >
-                        Open
-                      </Link>
+                      <div className="toolbar">
+                        <Link
+                          className="btn btn-secondary btn-small btn-link"
+                          href={`/exams/edit/?id=${e.id}`}
+                        >
+                          Open
+                        </Link>
+                        <Button variant="secondary" small onClick={() => void duplicate(e.id)}>
+                          Duplicate
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}

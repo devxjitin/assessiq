@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import {
   CERT_KIND_TITLE,
+  examPhase,
   type EnrollmentDto,
   type ExamSummaryDto,
   type MyCertificateDto,
@@ -285,15 +286,16 @@ function StudentHome() {
   );
 }
 
-const OVER = ['CLOSED', 'GRADING', 'RESULTS_FINAL', 'CERT_PENDING_APPROVAL', 'CERT_RELEASED'];
-
-/** Where an exam stands today, from its status and exam window. */
-function examPhase(e: ExamSummaryDto, now: number): 'draft' | 'scheduled' | 'open' | 'conducted' {
-  if (e.status === 'DRAFT' || e.status === 'PAYMENT_PENDING') return 'draft';
-  if (OVER.includes(e.status)) return 'conducted';
-  if (e.endsAt && new Date(e.endsAt).getTime() < now) return 'conducted';
-  if (e.startsAt && new Date(e.startsAt).getTime() > now) return 'scheduled';
-  return 'open';
+/** Where an exam stands today, from the shared rules. */
+function dashboardPhase(
+  e: ExamSummaryDto,
+  now: number,
+): 'draft' | 'scheduled' | 'open' | 'conducted' {
+  const phase = examPhase(e, new Date(now));
+  if (phase === 'DRAFT') return 'draft';
+  if (phase === 'UPCOMING') return 'scheduled';
+  if (phase === 'LIVE') return 'open';
+  return 'conducted';
 }
 
 function TrainerHome() {
@@ -306,8 +308,8 @@ function TrainerHome() {
   }, []);
   const list = exams ?? [];
   const now = Date.now();
-  const count = (phase: ReturnType<typeof examPhase>) =>
-    exams ? list.filter((e) => examPhase(e, now) === phase).length : '–';
+  const count = (phase: ReturnType<typeof dashboardPhase>) =>
+    exams ? list.filter((e) => dashboardPhase(e, now) === phase).length : '–';
   return (
     <>
       <Certificates />

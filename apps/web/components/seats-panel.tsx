@@ -46,6 +46,41 @@ export function SeatsPanel({
 
   const link = (token: string) => `${window.location.origin}/redeem/?token=${token}`;
 
+  async function seatAction(seatId: string, kind: 'resend' | 'reassign' | 'unassign') {
+    setError('');
+    setNote('');
+    try {
+      if (kind === 'resend') {
+        setBusy('resend' + seatId);
+        await api(`/exams/${exam.id}/seats/${seatId}/resend`, { method: 'POST' });
+        setNote('Link sent again.');
+      } else if (kind === 'reassign') {
+        const email = window.prompt('New email address for this seat:');
+        if (!email) return;
+        setData(
+          await api<SeatsDto>(`/exams/${exam.id}/seats/${seatId}/email`, {
+            method: 'PUT',
+            body: { email: email.trim() },
+          }),
+        );
+        setNote('Seat reassigned and the new student was emailed. The old link no longer works.');
+      } else {
+        if (
+          !window.confirm('Free this seat? The student will no longer be able to use their link.')
+        )
+          return;
+        setData(
+          await api<SeatsDto>(`/exams/${exam.id}/seats/${seatId}/email`, { method: 'DELETE' }),
+        );
+        setNote('Seat freed.');
+      }
+    } catch (err) {
+      setError(describeError(err).message);
+    } finally {
+      setBusy('');
+    }
+  }
+
   async function buy() {
     setBusy('buy');
     setError('');
@@ -139,6 +174,12 @@ export function SeatsPanel({
               {data.bought} bought · {data.redeemed} used · {free} free
             </strong>
           </div>
+          {data.closed && data.unused > 0 && (
+            <Alert kind="info">
+              The exam is over and {data.unused} seat{data.unused === 1 ? ' was' : 's were'} never
+              used. Contact NandiVex support if you want to ask about a refund.
+            </Alert>
+          )}
 
           {free > 0 && (
             <div>
@@ -179,9 +220,41 @@ export function SeatsPanel({
                     </td>
                     <td>
                       {s.status !== 'REDEEMED' && (
-                        <Button variant="secondary" small onClick={() => copy(link(s.token), s.id)}>
-                          {copied === s.id ? 'Copied' : 'Copy link'}
-                        </Button>
+                        <div className="toolbar">
+                          <Button
+                            variant="secondary"
+                            small
+                            onClick={() => copy(link(s.token), s.id)}
+                          >
+                            {copied === s.id ? 'Copied' : 'Copy link'}
+                          </Button>
+                          {s.email && (
+                            <>
+                              <Button
+                                variant="secondary"
+                                small
+                                loading={busy === 'resend' + s.id}
+                                onClick={() => void seatAction(s.id, 'resend')}
+                              >
+                                Resend
+                              </Button>
+                              <Button
+                                variant="secondary"
+                                small
+                                onClick={() => void seatAction(s.id, 'reassign')}
+                              >
+                                Change email
+                              </Button>
+                              <Button
+                                variant="secondary"
+                                small
+                                onClick={() => void seatAction(s.id, 'unassign')}
+                              >
+                                Unassign
+                              </Button>
+                            </>
+                          )}
+                        </div>
                       )}
                     </td>
                   </tr>
