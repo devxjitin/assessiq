@@ -1490,3 +1490,17 @@ html.theme-fade *::after {
 .consent input {
   margin-top: 3px;
 }
+
+/* ---------- receipts ---------- */
+.receipt table th {
+  text-align: left;
+  padding-right: 16px;
+  white-space: nowrap;
+}
+@media print {
+  .sidebar,
+  .no-print,
+  .site-footer {
+    display: none !important;
+  }
+}

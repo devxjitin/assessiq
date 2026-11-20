@@ -9,6 +9,7 @@ export * from './grading';
 export * from './coding';
 export * from './integrity';
 export * from './ledger';
+export * from './my-money';
 export * from './certificate';
 export * from './practice';
 export * from './admin';

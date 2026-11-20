@@ -255,6 +255,45 @@ Exam creation fee: INR ${rupees} (inclusive of applicable taxes)
     });
   }
 
+  /** A student asked for their exam fee back; tell the admins so it does not sit unseen. */
+  sendRefundRequested(
+    to: string,
+    r: {
+      receiptNo: string;
+      amountPaise: number;
+      studentName: string;
+      examTitle: string;
+      reason: string;
+    },
+  ) {
+    const amount = '₹' + (r.amountPaise / 100).toFixed(2);
+    return this.deliver({
+      to,
+      subject: `Refund request: ${r.receiptNo}`,
+      text: `${r.studentName} asked for a refund of ${amount} for "${r.examTitle}" (${r.receiptNo}).\nReason: ${r.reason}\nOpen Admin > Payments > Refund requests to approve or reject it.\n`,
+      html: layout(
+        'Refund request',
+        `<p><b>${esc(r.studentName)}</b> asked for a refund of ${esc(amount)} for &ldquo;${esc(r.examTitle)}&rdquo; (${esc(r.receiptNo)}).</p><p style="font-size:14px">Reason: ${esc(r.reason)}</p><p>Open Admin &gt; Payments &gt; Refund requests to approve or reject it.</p>`,
+      ),
+    });
+  }
+
+  sendRefundRequestRejected(
+    to: string,
+    name: string,
+    r: { receiptNo: string; examTitle: string; note: string },
+  ) {
+    return this.deliver({
+      to,
+      subject: `Your refund request ${r.receiptNo} was not approved`,
+      text: `Hi ${name},\n\nWe could not approve your refund request for "${r.examTitle}" (${r.receiptNo}).\nReason: ${r.note}\n\nIf you think this is wrong, reply through the contact page.\n`,
+      html: layout(
+        'Refund request not approved',
+        `<p>Hi ${esc(name)}, we could not approve your refund request for &ldquo;${esc(r.examTitle)}&rdquo; (${esc(r.receiptNo)}).</p><p style="font-size:14px">Reason: ${esc(r.note)}</p><p>If you think this is wrong, reach us through the contact page.</p>`,
+      ),
+    });
+  }
+
   sendSeatInvite(to: string, r: { examTitle: string; trainerName: string; link: string }) {
     return this.deliver({
       to,

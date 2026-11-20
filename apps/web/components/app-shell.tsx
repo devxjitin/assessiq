@@ -106,10 +106,21 @@ function navFor(role: string): NavItem[] {
   const home: NavItem = { href: '/dashboard/', label: 'Home', icon: 'home' };
   const profile: NavItem = { href: '/profile/', label: 'Profile', icon: 'user' };
   if (role === 'STUDENT') {
-    return [home, { href: '/join/', label: 'Join an exam', icon: 'join' }, profile];
+    return [
+      home,
+      { href: '/join/', label: 'Join an exam', icon: 'join' },
+      { href: '/payments/', label: 'My payments', icon: 'check' },
+      profile,
+    ];
   }
   if (role === 'EXAMINER') {
-    return [home, { href: '/exams/', label: 'Exams', icon: 'exams' }, profile];
+    return [
+      home,
+      { href: '/exams/', label: 'Exams', icon: 'exams' },
+      { href: '/earnings/', label: 'Earnings', icon: 'zap' },
+      { href: '/payments/', label: 'My payments', icon: 'check' },
+      profile,
+    ];
   }
   return [
     home,
@@ -135,6 +146,7 @@ const CRUMBS: Record<string, string> = {
   admin: 'Admin',
   payouts: 'Payouts',
   payments: 'Payments',
+  earnings: 'Earnings',
   certificates: 'Certificates',
   verify: 'Verify',
   redeem: 'Your seat',
