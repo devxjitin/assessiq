@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { LEGAL_VERSION } from '@assessiq/shared';
 import {
   PASSWORD,
   TestContext,
@@ -29,12 +30,18 @@ describe('registration and email verification', () => {
     await ctx
       .http()
       .post('/auth/register')
-      .send({ name: 'Squatter', email, password: 'Attacker-pass-1234', role: 'EXAMINER' })
+      .send({
+        acceptTerms: true,
+        name: 'Squatter',
+        email,
+        password: 'Attacker-pass-1234',
+        role: 'EXAMINER',
+      })
       .expect(202);
     await ctx
       .http()
       .post('/auth/register')
-      .send({ name: 'Real Owner', email, password: PASSWORD, role: 'STUDENT' })
+      .send({ acceptTerms: true, name: 'Real Owner', email, password: PASSWORD, role: 'STUDENT' })
       .expect(202);
     const code = lastCode(ctx.mail, email);
     await ctx.http().post('/auth/verify-email').send({ email, code }).expect(200);
@@ -53,7 +60,7 @@ describe('registration and email verification', () => {
     const reg = await ctx
       .http()
       .post('/auth/register')
-      .send({ name: 'New User', email, password: PASSWORD, role: 'STUDENT' })
+      .send({ acceptTerms: true, name: 'New User', email, password: PASSWORD, role: 'STUDENT' })
       .expect(202);
     expect(reg.body.accessToken).toBeUndefined();
     expect(ctx.mail.lastTo(email)?.subject).toMatch(/verify/i);
@@ -72,6 +79,7 @@ describe('registration and email verification', () => {
       .http()
       .post('/auth/register')
       .send({
+        acceptTerms: true,
         name: 'Verify Me',
         email,
         password: PASSWORD,
@@ -103,7 +111,7 @@ describe('registration and email verification', () => {
     await ctx
       .http()
       .post('/auth/register')
-      .send({ name: 'Brute', email, password: PASSWORD, role: 'STUDENT' })
+      .send({ acceptTerms: true, name: 'Brute', email, password: PASSWORD, role: 'STUDENT' })
       .expect(202);
     const code = lastCode(ctx.mail, email);
     const wrong = code === '000000' ? '111111' : '000000';
@@ -114,13 +122,45 @@ describe('registration and email verification', () => {
     await ctx.http().post('/auth/verify-email').send({ email, code }).expect(400);
   });
 
+  it('requires accepting the terms and records which version was accepted', async () => {
+    const body = {
+      name: 'Consent',
+      email: 'consent@example.com',
+      password: PASSWORD,
+      role: 'STUDENT',
+    };
+    const refused = await ctx.http().post('/auth/register').send(body).expect(400);
+    expect(Object.keys(refused.body.errors)).toContain('acceptTerms');
+    await ctx
+      .http()
+      .post('/auth/register')
+      .send({ ...body, acceptTerms: false })
+      .expect(400);
+    expect(await ctx.prisma.user.count()).toBe(0);
+
+    await ctx
+      .http()
+      .post('/auth/register')
+      .send({ ...body, acceptTerms: true })
+      .expect(202);
+    const user = await ctx.prisma.user.findUniqueOrThrow({ where: { email: body.email } });
+    expect(user.termsVersion).toBe(LEGAL_VERSION);
+    expect(user.termsAcceptedAt).toBeInstanceOf(Date);
+  });
+
   it('does not reveal that an email is already registered', async () => {
     const { email } = await signUp(ctx, { email: 'taken@example.com' });
     ctx.mail.clear();
     const again = await ctx
       .http()
       .post('/auth/register')
-      .send({ name: 'Someone Else', email, password: 'AnotherPass123', role: 'STUDENT' })
+      .send({
+        acceptTerms: true,
+        name: 'Someone Else',
+        email,
+        password: 'AnotherPass123',
+        role: 'STUDENT',
+      })
       .expect(202);
     expect(again.body.message).toBeTruthy();
     expect(ctx.mail.lastTo(email)?.subject).toMatch(/already have/i);
@@ -131,7 +171,13 @@ describe('registration and email verification', () => {
     await ctx
       .http()
       .post('/auth/register')
-      .send({ name: 'Sneaky', email: 'sneaky@example.com', password: PASSWORD, role: 'ADMIN' })
+      .send({
+        acceptTerms: true,
+        name: 'Sneaky',
+        email: 'sneaky@example.com',
+        password: PASSWORD,
+        role: 'ADMIN',
+      })
       .expect(400);
     expect(await ctx.prisma.user.count()).toBe(0);
   });
@@ -140,7 +186,13 @@ describe('registration and email verification', () => {
     const res = await ctx
       .http()
       .post('/auth/register')
-      .send({ name: 'X', email: 'not-an-email', password: 'short', role: 'STUDENT' })
+      .send({
+        acceptTerms: true,
+        name: 'X',
+        email: 'not-an-email',
+        password: 'short',
+        role: 'STUDENT',
+      })
       .expect(400);
     expect(Object.keys(res.body.errors)).toEqual(
       expect.arrayContaining(['name', 'email', 'password']),
@@ -221,12 +273,24 @@ describe('login', () => {
     await ctx
       .http()
       .post('/auth/register')
-      .send({ name: 'Old', email: 'old@example.com', password: PASSWORD, role: 'STUDENT' })
+      .send({
+        acceptTerms: true,
+        name: 'Old',
+        email: 'old@example.com',
+        password: PASSWORD,
+        role: 'STUDENT',
+      })
       .expect(202);
     await ctx
       .http()
       .post('/auth/register')
-      .send({ name: 'New', email: 'fresh@example.com', password: PASSWORD, role: 'STUDENT' })
+      .send({
+        acceptTerms: true,
+        name: 'New',
+        email: 'fresh@example.com',
+        password: PASSWORD,
+        role: 'STUDENT',
+      })
       .expect(202);
     await ctx.prisma.user.update({
       where: { email: 'old@example.com' },

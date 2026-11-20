@@ -75,6 +75,7 @@ export async function signUp(
     .http()
     .post('/auth/register')
     .send({
+      acceptTerms: true,
       name: overrides.name ?? 'Test User',
       email,
       password: PASSWORD,
