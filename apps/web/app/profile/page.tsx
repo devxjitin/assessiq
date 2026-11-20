@@ -15,11 +15,12 @@ import {
   describeError,
   validate,
 } from '../../components/ui';
+import { MyDataPanel } from '../../components/my-data-panel';
 import { api } from '../../lib/api';
 import { useRequireAuth } from '../../lib/auth';
 
 export default function ProfilePage() {
-  const { user, loading, setUser, setSession } = useRequireAuth();
+  const { user, loading, setUser, setSession, logout } = useRequireAuth();
   const [profileErrors, setProfileErrors] = useState<FieldErrors>({});
   const [profileMsg, setProfileMsg] = useState<{ kind: 'success' | 'error'; text: string } | null>(
     null,
@@ -137,6 +138,10 @@ export default function ProfilePage() {
           </form>
         </Card>
       </div>
+      <MyDataPanel
+        canClose={user.role !== 'ADMIN'}
+        onClosed={() => logout().then(() => (window.location.href = '/'))}
+      />
     </Shell>
   );
 }

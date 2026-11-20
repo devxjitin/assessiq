@@ -67,11 +67,11 @@ export default function PrivacyPage() {
       <p>
         You can ask to see, correct or delete your personal data, and to withdraw consent. On a
         deletion request your name, email and phone are anonymised and your sign-in is removed;
-        payment, ledger and certificate records are kept as described above. [Update this section
-        when the in-app &quot;delete my account&quot; and &quot;download my data&quot; features are
-        live; until then requests are handled by email.] [Grievance officer name and contact, as
-        required under Indian law, to be added.] Contact us through the{' '}
-        <a href="/contact/">contact page</a>.
+        payment, ledger and certificate records are kept as described above. Sign in and open{' '}
+        <b>Profile &gt; Your data</b> to download everything we hold about you as a file, or to
+        close your account. Trainers must first close or cancel open exams and be paid out.
+        [Grievance officer name and contact, as required under Indian law, to be added.] For
+        anything else, contact us through the <a href="/contact/">contact page</a>.
       </p>
 
       <h2>6. Security</h2>

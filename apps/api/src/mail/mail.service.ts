@@ -143,6 +143,19 @@ Open Admin > Payments and refund it.
     });
   }
 
+  /** Sent to the old address after an account was closed, so a stranger cannot do it unnoticed. */
+  sendAccountDeleted(to: string, name: string) {
+    return this.deliver({
+      to,
+      subject: 'Your Parakh account was closed',
+      text: `Hi ${name},\n\nYour Parakh account was closed and your name, email and phone were removed. Payment records and issued certificates are kept, as our privacy policy explains.\n\nIf this was not you, contact us straight away through the contact page.\n`,
+      html: layout(
+        'Your account was closed',
+        `<p>Hi ${esc(name)}, your Parakh account was closed and your name, email and phone were removed. Payment records and issued certificates are kept, as our privacy policy explains.</p><p>If this was not you, contact us straight away through the contact page.</p>`,
+      ),
+    });
+  }
+
   sendPasswordChanged(to: string, name: string) {
     return this.deliver({
       to,

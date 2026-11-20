@@ -87,6 +87,8 @@ model User {
   // Which version of the Terms and Privacy Policy the user accepted at sign-up, and when.
   termsAcceptedAt  DateTime?
   termsVersion     String?
+  // Set when the user closed their account; the personal details were wiped at that moment.
+  deletedAt        DateTime?
   failedLoginCount Int        @default(0)
   lockedUntil      DateTime?
   createdAt        DateTime   @default(now())

@@ -11,6 +11,7 @@
     "db:migrate": "prisma migrate deploy",
     "db:migrate:dev": "prisma migrate dev",
     "seed:admin": "node dist/scripts/seed-admin.js",
+    "seed:load": "node dist/scripts/seed-load-test.js",
     "migrate:legacy": "node dist/scripts/migrate-legacy.js"
   },
   "dependencies": {
