@@ -170,7 +170,9 @@ describe('payouts', () => {
     expect(csv).toContain('UTR123456');
     expect(csv).toContain('521.50');
     expect(csv).toContain('Student fee share');
-    await get(trainer, `/payouts/${paid.id}/statement.csv`).expect(403);
+    // A trainer may download their own statement (other trainers get 404: see earnings tests).
+    const own = (await get(trainer, `/payouts/${paid.id}/statement.csv`).expect(200)).text;
+    expect(own).toContain('UTR123456');
   });
 
   it('never pays more than is payable', async () => {

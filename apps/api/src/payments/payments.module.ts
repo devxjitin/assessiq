@@ -3,13 +3,20 @@ import { ENV, Env } from '../config/env';
 import { LedgerModule } from '../ledger/ledger.module';
 import { ExamLifecycleController } from './exam-lifecycle.controller';
 import { ExamLifecycleService } from './exam-lifecycle.service';
+import { AdminRefundRequestsController, MyPaymentsController } from './my-payments.controller';
+import { MyPaymentsService } from './my-payments.service';
 import { PaymentsController } from './payments.controller';
 import { PaymentsService } from './payments.service';
 import { PAYMENT_PROVIDER, createPaymentProvider } from './provider';
 
 @Module({
   imports: [LedgerModule],
-  controllers: [PaymentsController, ExamLifecycleController],
+  controllers: [
+    PaymentsController,
+    ExamLifecycleController,
+    MyPaymentsController,
+    AdminRefundRequestsController,
+  ],
   providers: [
     {
       provide: PAYMENT_PROVIDER,
@@ -18,6 +25,7 @@ import { PAYMENT_PROVIDER, createPaymentProvider } from './provider';
     },
     PaymentsService,
     ExamLifecycleService,
+    MyPaymentsService,
   ],
 })
 export class PaymentsModule {}

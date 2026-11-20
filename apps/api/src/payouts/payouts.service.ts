@@ -6,13 +6,17 @@ import {
   payoutLines,
   type AdminPayableRow,
   type DirectPayoutInput,
+  type EarningsDto,
+  type EarningsExamRow,
+  type PayoutDetailsDto,
+  type PayoutDetailsInput,
   type PayPayoutInput,
   type PayoutDto,
   type RejectPayoutInput,
 } from '@assessiq/shared';
 import { AuditService } from '../audit/audit.service';
 import type { AuthUser } from '../common/decorators';
-import { decryptText } from '../common/crypto';
+import { decryptText, encryptText } from '../common/crypto';
 import { ENV, Env } from '../config/env';
 import { LedgerService } from '../ledger/ledger.service';
 import { MailService } from '../mail/mail.service';
@@ -72,6 +76,146 @@ export class PayoutsService {
       return `${p.bankAccountName} · account number unreadable (ask the trainer to re-enter it)`;
     }
     return `${p.bankAccountName} · A/c ${number} · IFSC ${p.ifsc}`;
+  }
+
+  private detailsDto(p: ExaminerProfile | null): PayoutDetailsDto {
+    const bank = p?.payoutMethod === 'BANK';
+    return {
+      method: p?.payoutMethod ?? null,
+      upiId: p?.payoutMethod === 'UPI' ? p.upiId : null,
+      accountName: bank ? p.bankAccountName : null,
+      accountMasked: bank ? maskAccount(p.bankAccountLast4) : null,
+      ifsc: bank ? p.ifsc : null,
+      verifiedAt: p?.payoutDetailsVerifiedAt?.toISOString() ?? null,
+    };
+  }
+
+  // ------------------------------------------------------------------ trainer
+
+  /**
+   * A trainer's own money screen. The balances come from the same ledger function the admin
+   * payout screen uses, so the two can never show different numbers.
+   */
+  async earnings(user: AuthUser): Promise<EarningsDto> {
+    const [balances, profile, payouts, sums] = await Promise.all([
+      this.ledger.balances(user.id),
+      this.prisma.examinerProfile.findUnique({ where: { userId: user.id } }),
+      this.prisma.payout.findMany({
+        where: { examinerId: user.id },
+        orderBy: { requestedAt: 'desc' },
+        take: 50,
+      }),
+      this.prisma.ledgerEntry.groupBy({
+        by: ['examId'],
+        where: { account: ACCOUNTS.examiner(user.id), type: { not: 'PAYOUT' } },
+        _sum: { amountPaise: true },
+      }),
+    ]);
+    const examIds = sums.map((s) => s.examId).filter((x): x is string => !!x);
+    const [exams, joins] = await Promise.all([
+      this.prisma.exam.findMany({
+        where: { id: { in: examIds } },
+        select: { id: true, title: true, status: true, createdAt: true },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.payment.groupBy({
+        by: ['examId'],
+        where: { examId: { in: examIds }, purpose: 'EXAM_JOIN', status: 'CAPTURED' },
+        _count: { _all: true },
+        _sum: { amountPaise: true },
+      }),
+    ]);
+    const share = new Map(sums.map((s) => [s.examId, s._sum.amountPaise ?? 0]));
+    const joined = new Map(joins.map((j) => [j.examId, j]));
+    const rows: EarningsExamRow[] = exams.map((e) => ({
+      examId: e.id,
+      title: e.title,
+      status: e.status,
+      joins: joined.get(e.id)?._count._all ?? 0,
+      grossPaise: joined.get(e.id)?._sum.amountPaise ?? 0,
+      sharePaise: share.get(e.id) ?? 0,
+      state: e.status === 'RESULTS_FINAL' ? 'PAYABLE' : 'ACCRUED',
+    }));
+    return {
+      balances,
+      exams: rows,
+      payouts: payouts.map(toDto),
+      details: this.detailsDto(profile),
+    };
+  }
+
+  /** Saves where the trainer wants to be paid. Any change must be re-verified by NandiVex. */
+  async saveDetails(user: AuthUser, input: PayoutDetailsInput): Promise<PayoutDetailsDto> {
+    const common = { payoutDetailsUpdatedAt: new Date(), payoutDetailsVerifiedAt: null };
+    const data =
+      input.method === 'UPI'
+        ? {
+            ...common,
+            payoutMethod: 'UPI' as const,
+            upiId: input.upiId,
+            bankAccountName: null,
+            bankAccountNoEnc: null,
+            bankAccountLast4: null,
+            ifsc: null,
+          }
+        : {
+            ...common,
+            payoutMethod: 'BANK' as const,
+            upiId: null,
+            bankAccountName: input.accountName,
+            bankAccountNoEnc: encryptText(input.accountNumber, this.secret),
+            bankAccountLast4: input.accountNumber.slice(-4),
+            ifsc: input.ifsc,
+          };
+    const saved = await this.prisma.examinerProfile.upsert({
+      where: { userId: user.id },
+      create: { userId: user.id, ...data },
+      update: data,
+    });
+    // Never log the account number or UPI id; only that, and how, the details changed.
+    await this.audit.log({
+      actorId: user.id,
+      action: 'payout.details.update',
+      entity: 'User',
+      entityId: user.id,
+      meta: { method: input.method },
+    });
+    return this.detailsDto(saved);
+  }
+
+  /** Asks NandiVex to pay everything that is payable now. One open request at a time. */
+  async requestPayout(user: AuthUser): Promise<PayoutDto> {
+    const created = await this.prisma.$transaction(async (tx) => {
+      await this.lock(tx, user.id);
+      const profile = await tx.examinerProfile.findUnique({ where: { userId: user.id } });
+      if (!profile?.payoutMethod) throw new ConflictException('Add your payout details first');
+      const open = await tx.payout.findFirst({
+        where: { examinerId: user.id, status: 'REQUESTED' },
+      });
+      if (open) throw new ConflictException('You already have a payout request waiting');
+      const balances = await this.ledger.balances(user.id, tx);
+      if (balances.payablePaise <= 0 || balances.payablePaise < balances.minPayoutPaise) {
+        throw new ConflictException(
+          `You can ask for a payout once at least INR ${(Math.max(balances.minPayoutPaise, 1) / 100).toFixed(2)} is payable`,
+        );
+      }
+      return tx.payout.create({
+        data: {
+          examinerId: user.id,
+          amountPaise: balances.payablePaise,
+          method: profile.payoutMethod,
+          destination: this.snapshot(profile),
+        },
+      });
+    });
+    await this.audit.log({
+      actorId: user.id,
+      action: 'payout.request',
+      entity: 'Payout',
+      entityId: created.id,
+      meta: { amountPaise: created.amountPaise },
+    });
+    return toDto(created);
   }
 
   async statement(user: AuthUser, payoutId: string): Promise<{ filename: string; body: string }> {

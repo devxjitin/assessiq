@@ -11,6 +11,7 @@ import {
   describeError,
 } from '../../../components/ui';
 import { api } from '../../../lib/api';
+import { RefundRequestsPanel } from '../../../components/refund-requests-panel';
 import { useRequireAuth } from '../../../lib/auth';
 
 const rupees = (paise: number) => `₹${(paise / 100).toFixed(2)}`;
@@ -91,6 +92,7 @@ export default function AdminPaymentsPage() {
   return (
     <Shell wide>
       <PageHeader title="Payments" subtitle="Find a payment and refund it." />
+      <RefundRequestsPanel onChanged={() => void load()} />
       {error && <Alert>{error}</Alert>}
       {note && <Alert kind="success">{note}</Alert>}
       {rows && rows.some((p) => p.needsRefund && p.status === 'CAPTURED') && (

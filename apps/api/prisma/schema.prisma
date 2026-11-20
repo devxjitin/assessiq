@@ -116,32 +116,32 @@ enum StrikePolicy {
 }
 
 model Exam {
-  id                  String     @id @default(uuid()) @db.Uuid
-  examinerId          String     @db.Uuid
-  title               String
-  description         String?
-  instructions        String?
-  status              ExamStatus @default(DRAFT)
-  durationMinutes     Int        @default(60)
-  startsAt            DateTime?
-  endsAt              DateTime?
-  passPercent         Float      @default(40)
-  shuffleQuestions    Boolean    @default(true)
-  shuffleOptions      Boolean    @default(true)
+  id                 String       @id @default(uuid()) @db.Uuid
+  examinerId         String       @db.Uuid
+  title              String
+  description        String?
+  instructions       String?
+  status             ExamStatus   @default(DRAFT)
+  durationMinutes    Int          @default(60)
+  startsAt           DateTime?
+  endsAt             DateTime?
+  passPercent        Float        @default(40)
+  shuffleQuestions   Boolean      @default(true)
+  shuffleOptions     Boolean      @default(true)
   // OFF: events are only logged. WARN: strikes are counted and shown. AUTO_SUBMIT: submit at maxStrikes.
-  strikePolicy        StrikePolicy @default(AUTO_SUBMIT)
-  maxStrikes          Int        @default(3)
+  strikePolicy       StrikePolicy @default(AUTO_SUBMIT)
+  maxStrikes         Int          @default(3)
   // Certificate logo for this exam (private S3 key). Falls back to the trainer's default logo.
-  logoKey             String?
+  logoKey            String?
   // Certificate settings (layout, colours, wording); null means the defaults.
-  certificate         Json?
+  certificate        Json?
   // Share code (e.g. NVX-7K3P9Q), generated when the creation fee is captured.
-  code                String?    @unique
-  publishedAt         DateTime?
+  code               String?      @unique
+  publishedAt        DateTime?
   // Set when the trainer publishes results to students.
-  resultsPublishedAt  DateTime?
-  createdAt           DateTime   @default(now())
-  updatedAt           DateTime   @updatedAt
+  resultsPublishedAt DateTime?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
 
   examiner       User             @relation(fields: [examinerId], references: [id], onDelete: Restrict)
   questions      Question[]
@@ -209,9 +209,9 @@ model ExaminerProfile {
 model LoginFailure {
   email       String
   ip          String
-  count       Int      @default(0)
+  count       Int       @default(0)
   lockedUntil DateTime?
-  updatedAt   DateTime @updatedAt
+  updatedAt   DateTime  @updatedAt
 
   @@id([email, ip])
   @@index([updatedAt])
@@ -290,13 +290,38 @@ model Payment {
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
 
-  user       User        @relation(fields: [userId], references: [id], onDelete: Restrict)
-  exam       Exam?       @relation(fields: [examId], references: [id], onDelete: SetNull)
-  enrollment Enrollment?
-  seatPack   SeatPack?
+  user          User           @relation(fields: [userId], references: [id], onDelete: Restrict)
+  exam          Exam?          @relation(fields: [examId], references: [id], onDelete: SetNull)
+  enrollment    Enrollment?
+  seatPack      SeatPack?
+  refundRequest RefundRequest?
 
   @@index([userId, createdAt])
   @@index([examId, purpose, status])
+}
+
+enum RefundRequestStatus {
+  REQUESTED
+  APPROVED
+  REJECTED
+}
+
+/// A student asking for their exam fee back before they start. One request per payment.
+model RefundRequest {
+  id           String              @id @default(uuid()) @db.Uuid
+  paymentId    String              @unique @db.Uuid
+  userId       String              @db.Uuid
+  reason       String
+  status       RefundRequestStatus @default(REQUESTED)
+  decidedById  String?             @db.Uuid
+  decidedAt    DateTime?
+  decisionNote String?
+  createdAt    DateTime            @default(now())
+
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
+  @@index([userId])
 }
 
 // One row per gateway webhook event; the unique id makes redelivery harmless.
@@ -310,17 +335,17 @@ model WebhookEvent {
 
 // A student's paid seat in an exam. Created when the join fee is captured.
 model Enrollment {
-  id        String   @id @default(uuid()) @db.Uuid
-  examId    String   @db.Uuid
-  studentId String   @db.Uuid
-  paymentId String?  @unique @db.Uuid
+  id             String    @id @default(uuid()) @db.Uuid
+  examId         String    @db.Uuid
+  studentId      String    @db.Uuid
+  paymentId      String?   @unique @db.Uuid
   // Set when a sponsored seat paid for this enrollment instead of the student.
-  seatId    String?  @unique @db.Uuid
+  seatId         String?   @unique @db.Uuid
   // Set when the "your exam starts soon" email went out, so it is only sent once.
   reminderSentAt DateTime?
   // Extra time for this student (accommodation), set by the trainer. Added to the exam duration.
-  extraMinutes Int @default(0)
-  createdAt DateTime @default(now())
+  extraMinutes   Int       @default(0)
+  createdAt      DateTime  @default(now())
 
   exam    Exam     @relation(fields: [examId], references: [id], onDelete: Restrict)
   student User     @relation(fields: [studentId], references: [id], onDelete: Restrict)
@@ -408,27 +433,27 @@ model Attempt {
 }
 
 model Answer {
-  id           String    @id @default(uuid()) @db.Uuid
-  attemptId    String    @db.Uuid
-  questionId   String    @db.Uuid
+  id             String    @id @default(uuid()) @db.Uuid
+  attemptId      String    @db.Uuid
+  questionId     String    @db.Uuid
   // Choice questions: original option indexes. Subjective: text.
-  selected     Int[]
-  text         String?
-  flagged      Boolean   @default(false)
+  selected       Int[]
+  text           String?
+  flagged        Boolean   @default(false)
   // Marks given (auto for choice questions, by the trainer for subjective) and written feedback.
-  marksAwarded Float?
-  feedback     String?
-  gradedAt     DateTime?
+  marksAwarded   Float?
+  feedback       String?
+  gradedAt       DateTime?
   // Coding questions: language of the source in `text`, and the sample-run budget used so far.
-  language     String?
-  runs         Int       @default(0)
+  language       String?
+  runs           Int       @default(0)
   // Highest client sequence number applied; older autosaves that arrive late are ignored.
-  clientSeq    BigInt    @default(0)
+  clientSeq      BigInt    @default(0)
   // Trainer's mark for a choice answer, with the reason. Wins over the automatic mark.
   marksOverride  Float?
   overrideReason String?
-  lastRunAt    DateTime?
-  updatedAt    DateTime  @updatedAt
+  lastRunAt      DateTime?
+  updatedAt      DateTime  @updatedAt
 
   attempt Attempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
 

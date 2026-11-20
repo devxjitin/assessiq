@@ -1,10 +1,12 @@
-import { Body, Controller, Get, HttpCode, Param, Post, Query, Res } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Post, Put, Query, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import {
   directPayoutSchema,
+  payoutDetailsSchema,
   payPayoutSchema,
   rejectPayoutSchema,
   type DirectPayoutInput,
+  type PayoutDetailsInput,
   type PayPayoutInput,
   type RejectPayoutInput,
 } from '@assessiq/shared';
@@ -13,18 +15,44 @@ import { ZodValidationPipe } from '../common/zod.pipe';
 import { LedgerService } from '../ledger/ledger.service';
 import { PayoutsService } from './payouts.service';
 
-/** Payout statements (admin only). */
+/** Payout statements: admins any, a trainer only their own (the service scopes it). */
 @Controller()
 export class PayoutsController {
   constructor(private readonly payouts: PayoutsService) {}
 
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'EXAMINER')
   @Get('payouts/:id/statement.csv')
   async statement(@CurrentUser() user: AuthUser, @Param('id') id: string, @Res() res: Response) {
     const { filename, body } = await this.payouts.statement(user, id);
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.send(body);
+  }
+}
+
+/** A trainer's own earnings, payout details and payout requests. */
+@Roles('EXAMINER')
+@Controller('me')
+export class EarningsController {
+  constructor(private readonly payouts: PayoutsService) {}
+
+  @Get('earnings')
+  earnings(@CurrentUser() user: AuthUser) {
+    return this.payouts.earnings(user);
+  }
+
+  @Put('payout-details')
+  saveDetails(
+    @CurrentUser() user: AuthUser,
+    @Body(new ZodValidationPipe(payoutDetailsSchema)) body: PayoutDetailsInput,
+  ) {
+    return this.payouts.saveDetails(user, body);
+  }
+
+  @Post('payouts/request')
+  @HttpCode(200)
+  request(@CurrentUser() user: AuthUser) {
+    return this.payouts.requestPayout(user);
   }
 }
 
