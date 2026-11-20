@@ -155,7 +155,9 @@ describe('student refund requests', () => {
     await post(lee, `/me/payments/${payment.id}/refund-request`, { reason: 'Not mine' }).expect(
       404,
     );
-    await post(sam, `/me/payments/${payment.id}/refund-request`, { reason: 'Need it back' }).expect(200);
+    await post(sam, `/me/payments/${payment.id}/refund-request`, { reason: 'Need it back' }).expect(
+      200,
+    );
     await get(sam, '/admin/finance/refund-requests').expect(403);
     await get(trainer, '/admin/finance/refund-requests').expect(403);
 
