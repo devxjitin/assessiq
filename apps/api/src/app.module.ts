@@ -6,7 +6,9 @@ import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { RolesGuard } from './auth/roles.guard';
+import { applyRateLimits } from './common/rate-limits';
 import { ConfigModule } from './config/config.module';
+import { ENV, Env } from './config/env';
 import { AttemptsModule } from './attempts/attempts.module';
 import { CertificatesModule } from './certificates/certificates.module';
 import { CodeModule } from './code/code.module';
@@ -33,10 +35,17 @@ import { UsersModule } from './users/users.module';
  */
 @Module({
   imports: [
-    // Generous global limit; auth routes set a stricter one. Off in tests.
-    ThrottlerModule.forRoot({
-      throttlers: [{ ttl: 60_000, limit: 120 }],
-      skipIf: () => process.env.NODE_ENV === 'test',
+    // Per-IP ceilings from RATE_LIMIT_* (see common/rate-limits.ts). Off in tests unless a test
+    // sets RATE_LIMIT_TEST=on.
+    ThrottlerModule.forRootAsync({
+      inject: [ENV],
+      useFactory: (env: Env) => {
+        applyRateLimits(env);
+        return {
+          throttlers: [{ ttl: 60_000, limit: env.RATE_LIMIT_IP_PER_MIN }],
+          skipIf: () => process.env.NODE_ENV === 'test' && process.env.RATE_LIMIT_TEST !== 'on',
+        };
+      },
     }),
     ConfigModule,
     PrismaModule,

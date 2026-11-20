@@ -9,6 +9,7 @@ import {
   type RedeemSeatInput,
 } from '@assessiq/shared';
 import { AuthUser, CurrentUser, Roles } from '../common/decorators';
+import { RATE, perMinute } from '../common/rate-limits';
 import { ZodValidationPipe } from '../common/zod.pipe';
 import { SeatsService } from './seats.service';
 
@@ -69,14 +70,14 @@ export class SeatsController {
 
   /** Tokens are 160-bit secrets, but limit guessing anyway. */
   @Roles('STUDENT')
-  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  @Throttle({ default: perMinute(() => RATE.lookupIpPerMin) })
   @Get('seats/preview')
   preview(@Query('token') token = '') {
     return this.seats.preview(token);
   }
 
   @Roles('STUDENT')
-  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @Throttle({ default: perMinute(() => RATE.lookupIpPerMin) })
   @Post('seats/redeem')
   @HttpCode(200)
   redeem(

@@ -56,6 +56,13 @@ const schema = z.object({
   AUTH_JOBS_POLL: z.enum(['on', 'off']).default('on'),
   // 'on' starts the minute-by-minute job that ends attempts whose time ran out.
   SWEEP_JOBS_POLL: z.enum(['on', 'off']).default('on'),
+  // Per-IP request ceilings (per minute). High on purpose: a classroom or college shares one public
+  // IP. Brute-force and email flooding are limited per account, not per IP.
+  RATE_LIMIT_IP_PER_MIN: z.coerce.number().int().min(1).default(1200),
+  RATE_LIMIT_LOGIN_IP_PER_MIN: z.coerce.number().int().min(1).default(600),
+  RATE_LIMIT_REFRESH_IP_PER_MIN: z.coerce.number().int().min(1).default(600),
+  RATE_LIMIT_SIGNUP_IP_PER_MIN: z.coerce.number().int().min(1).default(120),
+  RATE_LIMIT_LOOKUP_IP_PER_MIN: z.coerce.number().int().min(1).default(300),
 });
 
 export type Env = z.infer<typeof schema> & { cookieSecure: boolean };
