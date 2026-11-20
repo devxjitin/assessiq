@@ -13,23 +13,27 @@
 | [k6](https://k6.io/docs/get-started/installation/) installed on the machine that generates load                                | You (not installed here) |
 | A staging environment you may load: shared, so pick a time with no real exam                                                   | You                      |
 | A way to run the seed script where it can reach the staging database (the database is private, so on the app host through SSM) | You                      |
-| The rate-limit decision below                                                                                                  | You                      |
+| Raising the per-IP rate-limit ceilings on staging for the test (see below)                                                     | You                      |
 
 Run it from a stable connection. A home Wi-Fi link can be the bottleneck instead of the server; if numbers look bad, repeat from a small cloud machine in the same region.
 
 ## Rate limits (read this first)
 
-The API limits requests **per IP address**, and a load generator is a single IP, so the test will measure rate-limit refusals (HTTP 429) instead of capacity unless this is handled:
+The API limits requests per IP address, and a load generator is a single IP. The ceilings are high by default so a classroom behind one college network can sign in together, but a 500-student test from one machine can still reach them, and then the test would measure refusals (HTTP 429) instead of capacity.
 
-| Route                                                                     | Limit                                                                    |
-| ------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| `POST /auth/login`                                                        | 10 per minute per IP                                                     |
-| `POST /auth/refresh`                                                      | 30 per minute per IP                                                     |
-| `GET /join/:code`                                                         | 30 per minute per IP                                                     |
-| Everything else (for example `GET /me/enrollments`)                       | 120 per minute per IP                                                    |
-| Exam routes (`/attempts/...`: start, autosave, submit, proctoring events) | Exempt from the IP limit; limited to 240 per minute per **user** instead |
+| Setting (environment)           | Default | What it caps, per IP per minute                                    |
+| ------------------------------- | ------- | ------------------------------------------------------------------ |
+| `RATE_LIMIT_IP_PER_MIN`         | 1200    | Everything not listed below                                        |
+| `RATE_LIMIT_LOGIN_IP_PER_MIN`   | 600     | Sign-in, code entry                                                |
+| `RATE_LIMIT_REFRESH_IP_PER_MIN` | 600     | Session renewal                                                    |
+| `RATE_LIMIT_SIGNUP_IP_PER_MIN`  | 120     | Routes that send an email (register, resend code, forgot password) |
+| `RATE_LIMIT_LOOKUP_IP_PER_MIN`  | 300     | Exam-code and sponsored-seat lookups                               |
 
-**This is also a real-world problem, not only a testing one.** Students in one classroom or college usually share one public IP. With a 10-per-minute sign-in limit, 30 students sitting down together cannot all sign in during the first minute, and a campus of 500 would hit the token-refresh limit (30 per minute) mid-exam. The autosave path is fine, because it is exempt. **Decision needed before launch:** raise or restructure the per-IP limits on sign-in, refresh and enrollment lookup (for example per-account limits plus a much higher per-IP ceiling), and make the numbers configurable so staging can be relaxed for this test. Until then the load test can only be run from many IPs, or against a staging copy with the limits raised.
+Exam routes (`/attempts/...`: start, autosave, submit, proctoring events) are exempt from the IP limit; they are limited to 240 per minute per **user** instead.
+
+The real protection is per account, not per IP, and it stays on during the test: sign-in and code entry allow 10 tries a minute for one email from one network, and routes that send mail allow 5 a minute to one address from anywhere. The k6 script signs each student in once, so these do not get in the way.
+
+**For the load test, raise the ceilings on staging first.** Set the five `RATE_LIMIT_*` parameters in SSM under `/assessiq/staging/` to a large number (for example `100000`), deploy, run the test, then delete the parameters and deploy again so staging goes back to the defaults. Do not leave them raised. (If you would rather not touch staging, run k6 from several machines.)
 
 ## Steps
 

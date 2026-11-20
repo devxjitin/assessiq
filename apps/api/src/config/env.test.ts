@@ -41,3 +41,25 @@ describe('production guards', () => {
     ).not.toThrow();
   });
 });
+
+describe('per-IP rate limit ceilings', () => {
+  it('defaults to ceilings high enough for a classroom on one IP', () => {
+    const env = loadEnv(base);
+    expect(env).toMatchObject({
+      RATE_LIMIT_IP_PER_MIN: 1200,
+      RATE_LIMIT_LOGIN_IP_PER_MIN: 600,
+      RATE_LIMIT_REFRESH_IP_PER_MIN: 600,
+      RATE_LIMIT_SIGNUP_IP_PER_MIN: 120,
+      RATE_LIMIT_LOOKUP_IP_PER_MIN: 300,
+    });
+  });
+  it('can be changed from the environment', () => {
+    const env = loadEnv({ ...base, RATE_LIMIT_LOGIN_IP_PER_MIN: '5000' });
+    expect(env.RATE_LIMIT_LOGIN_IP_PER_MIN).toBe(5000);
+  });
+  it.each(['0', '-1', 'lots', '1.5'])('rejects %s', (value) => {
+    expect(() => loadEnv({ ...base, RATE_LIMIT_IP_PER_MIN: value })).toThrow(
+      /RATE_LIMIT_IP_PER_MIN/,
+    );
+  });
+});
